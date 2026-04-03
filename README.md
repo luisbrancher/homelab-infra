@@ -1,85 +1,85 @@
 # proxmox-infra
 
-Infraestrutura do homelab provisionada com Terraform no Proxmox. Parte de um stack completo onde o Terraform cria as VMs, o Ansible configura o OS de cada uma, e o k3s orquestra os serviços.
+Homelab infrastructure provisioned with Terraform on Proxmox. Part of a complete stack where Terraform creates the VMs, Ansible configures each OS, and k3s orchestrates the services.
 
-## Stack completo
+## Full stack
 
 ```
-Terraform   → cria as VMs no Proxmox (CPU, RAM, disco, rede)
+Terraform   → provisions VMs on Proxmox (CPU, RAM, disk, network)
      ↓
-Ansible     → configura o OS de cada VM (instala k3s, NFS, hardening)
+Ansible     → configures each VM OS (installs k3s, NFS, hardening)
      ↓
-k3s         → orquestra os containers e garante o estado dos serviços
+k3s         → orchestrates containers and ensures desired service state
      ↓
-ArgoCD      → GitOps, aplica mudanças no k3s via git push
+ArgoCD      → GitOps, applies changes to k3s via git push
 ```
 
-## Arquitetura
+## Architecture
 
 ```
 Proxmox (i5 1345U)
-├── VM: k3s-node        → serviços principais
+├── VM: k3s-node        → main services
 ├── VM: storage-server  → NFS, backups
 └── LXC: lxc-monitoring → Prometheus + Grafana + Loki
 
 Pi4
-├── Omada Controller    → gerenciamento dos APs
-└── MotionEye           → câmeras
+├── Omada Controller    → AP management
+└── MotionEye           → cameras
 ```
 
 ### k3s-node
-VM principal onde todos os serviços rodam como containers orquestrados pelo k3s. O k3s substitui o Docker Compose com modelo declarativo — você descreve o estado desejado via manifests YAML e ele garante continuamente que os serviços estão rodando, reiniciando automaticamente em caso de falha.
+Main VM where all services run as containers orchestrated by k3s. k3s replaces Docker Compose with a declarative model — you describe the desired state via YAML manifests and k3s continuously ensures services are running, automatically restarting them on failure.
 
-Serviços planejados:
-- NextCloud
+Planned services:
+- Nextcloud
 - Jellyfin
 - Immich
 - UpSnap
-- Traefik (ingress controller, já incluso no k3s)
+- Traefik (ingress controller, bundled with k3s)
 - Cert-manager
 
 ### storage-server
-VM dedicada a armazenamento. Exporta volumes via NFS que o k3s-node monta para persistir dados dos serviços. Disco adicional de 100GB separado do disco do OS. Não roda serviços de aplicação.
+VM dedicated to storage. Exports NFS volumes mounted by k3s-node to persist service data. Additional 100GB disk separate from the OS disk. Does not run any application services.
 
 ### lxc-monitoring
-Container LXC leve rodando o stack de observabilidade:
-- **Prometheus** — coleta métricas de todas as VMs e serviços
-- **Grafana** — dashboards de CPU, RAM, disco, latência
-- **Loki** — agregação de logs de todos os serviços
+Lightweight LXC container running the observability stack:
+- **Prometheus** — collects metrics from all VMs and services
+- **Grafana** — dashboards for CPU, RAM, disk, latency
+- **Loki** — log aggregation from all services
+
+Runs outside k3s intentionally — survives restarts of the main VM.
 
 ### Pi4
-Hardware dedicado a serviços de rede e câmeras, gerenciado via Ansible.
-- **Omada Controller** — gerenciamento dos APs TP-Link (Docker, imagem ARM)
-- **MotionEye** — monitoramento de câmeras (bare metal via apt)
+Dedicated hardware for network and camera services, managed via Ansible.
+- **Omada Controller** — TP-Link AP management (Docker, ARM image)
+- **MotionEye** — camera monitoring (bare metal via apt)
 
 ### VPN
-- **Tailscale** — instalado via Ansible no OS de todas as máquinas do homelab
+- **Tailscale** — installed via Ansible on the OS of every homelab machine
 
-Roda fora do k3s intencionalmente — sobrevive a restarts da VM principal.
-
-## Estrutura do projeto
+## Project structure
 
 ```
 homelab-infra/
 ├── terraform/
-    ├── main.tf             → terraform block + provider proxmox
-    ├── variables.tf        → todas as variáveis centralizadas
-    ├── outputs.tf          → IPs das VMs após o apply
+    ├── main.tf             → terraform block + proxmox provider
+    ├── variables.tf        → all variables centralized
+    ├── outputs.tf          → VM IPs after apply
     └── vms/
         ├── k3s-node.tf
         ├── storage-server.tf
         └── monitoring.tf
 ```
 
-## Pré-requisitos
+## Prerequisites
 
-- Proxmox instalado no hardware (instalação manual via ISO)
-- Template Debian 12 criado no Proxmox para clone das VMs (`vm_template`)
-- Template LXC Debian 12 disponível no Proxmox (`lxc_template`)
-- HCP Terraform configurado com as variáveis sensíveis
-- Debian ARM instalado no Pi4
- 
-## Como usar
+- Proxmox installed on hardware (manual install via ISO)
+- Debian 12 VM template created on Proxmox (`vm_template`)
+- Debian 12 LXC template available on Proxmox (`lxc_template`)
+- HCP Terraform configured with sensitive variables
+- Debian ARM installed on Pi4
+
+## Usage
 
 ```bash
 terraform init
@@ -87,7 +87,7 @@ terraform plan
 terraform apply
 ```
 
-Após o apply, os IPs das VMs ficam disponíveis nos outputs:
+After apply, VM IPs are available via outputs:
 
 ```bash
 terraform output ip_k3s_server
@@ -95,12 +95,12 @@ terraform output ip_storage_server
 terraform output ip_monitoring_server
 ```
 
-Esses IPs são usados pelo Ansible na etapa seguinte para configurar o OS de cada VM.
+These IPs are used by Ansible in the next step to configure each VM OS.
 
-## Próximos passos
+## Next steps
 
-- [ ] Ansible para configuração do OS das VMs + TailScale + Pi services
-- [ ] Instalação e configuração do k3s via Ansible
-- [ ] Configuração do NFS no storage-server
-- [ ] Deploy dos serviços via manifests k8s
-- [ ] GitOps com ArgoCD
+- [ ] Ansible for VM OS configuration + Tailscale + Pi services
+- [ ] k3s installation and configuration via Ansible
+- [ ] NFS setup on storage-server
+- [ ] Service deployment via k8s manifests
+- [ ] GitOps with ArgoCD
