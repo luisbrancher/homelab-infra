@@ -1,0 +1,34 @@
+# Gerenciado pelo Ansible — não editar manualmente
+
+global:
+  # intervalo padrão de coleta de métricas
+  scrape_interval: 15s
+  # intervalo de avaliação de alertas
+  evaluation_interval: 15s
+
+scrape_configs:
+
+  # o próprio Prometheus se monitora
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # métricas do k3s-node
+  - job_name: "k3s-node"
+    static_configs:
+      - targets: ["{{ hostvars['k3s-node']['ansible_host'] }}:9100"]
+
+  # métricas do storage-server
+  - job_name: "storage-server"
+    static_configs:
+      - targets: ["{{ hostvars['storage-server']['ansible_host'] }}:9100"]
+
+  # métricas do lxc-monitoring
+  - job_name: "lxc-monitoring"
+    static_configs:
+      - targets: ["localhost:9100"]
+
+  # métricas do pi4
+  - job_name: "pi4"
+    static_configs:
+      - targets: ["{{ hostvars['pi4']['ansible_host'] }}:9100"]

@@ -1,0 +1,167 @@
+---
+
+- name: Configurar lxc-monitoring
+  hosts: lxc-monitoring                # hosts do inventory que se aplica
+  become: true                         # sudo
+
+  pre_tasks:
+    # apt-get update
+    - name: Atualizar cache do apt
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600  # só atualiza se o cache tiver mais de 1h
+
+  tasks:
+    - name: Instalar dependências
+      ansible.builtin.apt:
+        name:
+        - curl
+        - wget
+        - net-tools
+        state: present
+      
+    # grafana
+    - name: Adicionar chave GPG do Grafana
+      ansible.builtin.apt_key:
+        url: https://apt.grafana.com/gpg.key
+        state: present
+
+    - name: Adicionar repositório do Grafana
+      ansible.builtin.apt_repository:
+        repo: "deb https://apt.grafana.com stable main"
+        state: present
+
+    - name: Instalar Grafana
+      ansible.builtin.apt:
+        name: grafana
+        update_cache: true
+        state: present
+
+    - name: Copiar config do Grafana
+      ansible.builtin.template:
+        src: templates/grafana.ini.j2
+        dest: /etc/grafana/grafana.ini
+        owner: grafana
+        group: grafana
+      notify: Restart Grafana
+
+    # prometheus
+    - name: Instalar Prometheus
+      ansible.builtin.apt:
+        name: prometheus
+        state: present
+
+    - name: Copiar config do Prometheus
+      ansible.builtin.template:
+        src: templates/prometheus.yml.j2
+        dest: /etc/prometheus/prometheus.yml
+        owner: prometheus
+        group: prometheus
+      notify: Restart Prometheus
+
+    # loki
+    - name: Criar usuário do Loki
+      ansible.builtin.user:
+        name: loki
+        system: true # usuário de sistema (UID baixo, sem home directory)
+        shell: /bin/false # impede login direto
+
+    - name: Baixar binário do Loki
+      ansible.builtin.get_url:
+        url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
+        dest: /tmp/loki.zip
+
+    - name: Descompactar binário do Loki
+      ansible.builtin.unarchive:
+        src: /tmp/loki.zip
+        dest: /usr/local/bin/
+        remote_src: true
+        mode: '0755'
+
+    - name: Criar diretórios de dados do Loki
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: loki
+        group: loki
+      loop:
+        - /etc/loki
+        - /var/loki/index
+        - /var/loki/cache
+        - /var/loki/chunks
+
+    - name: Copiar config do Loki
+      ansible.builtin.template:
+        src: templates/loki-config.j2
+        dest: /etc/loki/config.yml
+        owner: loki
+        group: loki
+      notify: Restart Loki
+
+    - name: Criar service do Loki no systemd
+      ansible.builtin.template:
+        src: templates/loki.service.j2
+        dest: /etc/systemd/system/loki.service
+      notify: Habilitar e iniciar Loki
+
+    - name: Garantir que os três estão rodando no boot
+      ansible.builtin.service:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+      loop:
+      - grafana-server
+      - prometheus
+      - loki 
+
+  # node exporter
+    - name: Instalar Node Exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: present
+
+    - name: Garantir que Node Exporter está rodando
+      ansible.builtin.service:
+        name: prometheus-node-exporter
+        state: started
+        enabled: true
+
+  # tailscale
+    - name: Baixar e rodar o script de instalação do Tailscale
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://tailscale.com/install.sh | sh
+        creates: /usr/bin/tailscale  # idempotência: só roda se o binário ainda não existir
+
+    - name: Conectar ao Tailscale com a auth key
+      ansible.builtin.command:
+        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
+        creates: /var/lib/tailscale/tailscaled.state  # idem — evita reconectar toda vez
+
+    - name: Garantir que o tailscaled está rodando no boot
+      ansible.builtin.service:
+        name: tailscaled
+        state: started
+        enabled: true 
+
+  handlers:
+    - name: Habilitar e iniciar Loki
+      ansible.builtin.systemd:
+        name: loki
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Restart Loki
+      ansible.builtin.service:
+        name: loki
+        state: restarted
+
+    - name: Restart Prometheus
+      ansible.builtin.service:
+        name: prometheus
+        state: restarted
+
+    - name: Restart Grafana
+      ansible.builtin.service:
+        name: grafana-server
+        state: restarted 

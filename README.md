@@ -1,6 +1,6 @@
-# proxmox-infra
+## homelab-infra
 
-Homelab infrastructure provisioned with Terraform on Proxmox. Part of a complete stack where Terraform creates the VMs, Ansible configures each OS, and k3s orchestrates the services.
+Homelab infrastructure as code: Proxmox VMs provisioned with Terraform, configured with Ansible, services orchestrated with k3s and deployed via ArgoCD.
 
 ## Full stack
 
@@ -17,6 +17,9 @@ ArgoCD      → GitOps, applies changes to k3s via git push
 ## Architecture
 
 ```
+N150
+└── OPNsense bare metal → router, firewall, VLANs
+
 Proxmox (i5 1345U)
 ├── VM: k3s-node        → main services
 ├── VM: storage-server  → NFS, backups
@@ -62,13 +65,31 @@ Dedicated hardware for network and camera services, managed via Ansible.
 ```
 homelab-infra/
 ├── terraform/
-    ├── main.tf             → terraform block + proxmox provider
-    ├── variables.tf        → all variables centralized
-    ├── outputs.tf          → VM IPs after apply
-    └── vms/
-        ├── k3s-node.tf
-        ├── storage-server.tf
-        └── monitoring.tf
+│   ├── main.tf                   → terraform block + proxmox provider
+│   ├── variables.tf              → all variables centralized
+│   ├── outputs.tf                → VM IPs after apply
+│   └── vms/
+│       ├── k3s-node.tf
+│       ├── storage-server.tf
+│       └── monitoring.tf
+└── ansible/
+    ├── inventory.ini             → hosts and groups
+    ├── site.yml                  → main entrypoint, imports all playbooks
+    ├── group_vars/all/
+    │   ├── vars.yml              → shared variables
+    │   └── vault.yml             → encrypted secrets (Ansible Vault)
+    └── playbooks/
+        ├── proxmox.yml           → imports all Proxmox playbooks
+        ├── k3s-node.yml          → k3s + Tailscale + Node Exporter
+        ├── storage-server.yml    → NFS + Tailscale + Node Exporter
+        ├── monitoring.yml        → Prometheus + Grafana + Loki + Tailscale
+        ├── pi4.yml               → Omada + MotionEye + Tailscale + Node Exporter
+        └── templates/
+            ├── exports.j2        → /etc/exports (NFS)
+            ├── prometheus.yml.j2 → Prometheus scrape config
+            ├── grafana.ini.j2    → Grafana config
+            ├── loki-config.j2    → Loki config
+            └── loki.service.j2   → Loki systemd service
 ```
 
 ## Prerequisites
@@ -80,6 +101,8 @@ homelab-infra/
 - Debian ARM installed on Pi4
 
 ## Usage
+
+1. Provision infrastructure with Terraform
 
 ```bash
 terraform init
@@ -95,12 +118,31 @@ terraform output ip_storage_server
 terraform output ip_monitoring_server
 ```
 
-These IPs are used by Ansible in the next step to configure each VM OS.
+2. Configure VMs with Ansible
+Update ansible/inventory.ini with the IPs from Terraform outputs, then:
+
+```bash
+bashcd ansible
+
+# run everything
+ansible-playbook site.yml
+
+# or run specific targets
+ansible-playbook playbooks/proxmox.yml
+ansible-playbook playbooks/pi4.yml
+ansible-playbook playbooks/monitoring.yml
+```
+
+Sensitive variables are managed via Ansible Vault:
+
+```bash
+bashansible-vault edit group_vars/all/vault.yml
+ansible-playbook site.yml --ask-vault-pass
+```
 
 ## Next steps
 
-- [ ] Ansible for VM OS configuration + Tailscale + Pi services
-- [ ] k3s installation and configuration via Ansible
-- [ ] NFS setup on storage-server
-- [ ] Service deployment via k8s manifests
+- [x] Terraform for Proxmox VM provisioning
+- [x] Ansible for VM OS configuration + Tailscale + Pi services + NFS setup
+- [ ] Service deployment via k3s manifests
 - [ ] GitOps with ArgoCD

@@ -1,0 +1,54 @@
+---
+
+- name: Configurar k3s-node
+  hosts: k3s-node                # hosts do inventory que se aplica
+  become: true                   # sudo
+
+  pre_tasks:
+    # apt-get update
+    - name: Atualizar cache do apt
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600  # só atualiza se o cache tiver mais de 1h
+
+
+  tasks:
+    - name: Baixar e rodar o script de instalação do k3s
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://get.k3s.io | sh
+        creates: /usr/local/bin/k3s  # idempotência: só roda se o binário ainda não existir
+
+    - name: Garantir que o k3s está rodando no boot
+      ansible.builtin.service:
+        name: k3s
+        state: started
+        enabled: true     
+
+  # node exporter
+    - name: Instalar Node Exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: present
+
+    - name: Garantir que Node Exporter está rodando
+      ansible.builtin.service:
+        name: prometheus-node-exporter
+        state: started
+        enabled: true
+
+  # tailscale
+    - name: Baixar e rodar o script de instalação do Tailscale
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://tailscale.com/install.sh | sh
+        creates: /usr/bin/tailscale  # idempotência: só roda se o binário ainda não existir
+
+    - name: Conectar ao Tailscale com a auth key
+      ansible.builtin.command:
+        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
+        creates: /var/lib/tailscale/tailscaled.state  # idem — evita reconectar toda vez
+
+    - name: Garantir que o tailscaled está rodando no boot
+      ansible.builtin.service:
+        name: tailscaled
+        state: started
+        enabled: true

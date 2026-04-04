@@ -1,0 +1,18 @@
+# Gerenciado pelo Ansible — não editar manualmente
+
+[server]
+# porta que o Grafana escuta
+http_port = {{ grafana_port }}
+
+[security]
+# usuário admin padrão — senha via vault
+admin_user = {{ grafana_admin_user }}
+admin_password = {{ grafana_admin_password }}
+
+[auth.anonymous]
+# desabilita acesso sem login
+enabled = false
+
+[log]
+mode = console
+level = info

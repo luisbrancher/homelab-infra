@@ -1,0 +1,5 @@
+---
+
+- import_playbook: k3s-node.yml
+- import_playbook: storage-server.yml
+- import_playbook: monitoring.yml

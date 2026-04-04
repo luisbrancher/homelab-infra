@@ -1,0 +1,4 @@
+---
+
+- import_playbook: playbooks/proxmox.yml
+- import_playbook: playbooks/pi4.yml

@@ -1,0 +1,14 @@
+[Unit]
+Description=Loki log aggregation
+# inicia só depois da rede estar disponível #
+After=network.target
+
+[Service]
+User=loki
+ExecStart=/usr/local/bin/loki -config.file=/etc/loki/config.yml
+# reinicia automaticamente se o processo cair #
+Restart=always
+
+[Install]
+# registra o serviço pra iniciar no boot #
+WantedBy=multi-user.target

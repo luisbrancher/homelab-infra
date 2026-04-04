@@ -1,0 +1,39 @@
+ansible_user: root
+ansible_ssh_private_key_file: ~/.ssh/id_ed25519_homelab
+ansible_become: yes
+
+# proxmox
+nfs_server: <IP storage-server>
+
+k3s_node_ip: "{{ hostvars['k3s-node']['ansible_host'] }}"
+storage_server_ip: "{{ hostvars['storage-server']['ansible_host'] }}"
+lxc_monitoring_ip: "{{ hostvars['lxc-monitoring']['ansible_host'] }}"
+
+storage_mount: /mnt/data
+storage_device: /dev/sda
+
+grafana_port: 3000
+grafana_admin_user: admin
+
+loki_version: "2.9.4"
+loki_port: 3100
+
+nfs_exports:
+  - path: /mnt/data/nextcloud
+    clients: "{{ k3s_node_ip }}"
+    options: rw,sync,no_subtree_check
+  - path: /mnt/data/immich
+    clients: "{{ k3s_node_ip }}"
+    options: rw,sync,no_subtree_check
+  - path: /mnt/data/upsnap
+    clients: "{{ k3s_node_ip }}"
+    options: rw,sync,no_subtree_check
+  - path: /mnt/data/backups
+    clients: "{{ k3s_node_ip }}"
+    options: rw,sync,no_subtree_check
+
+# pi4
+omada_download_url: "https://static.tp-link.com/upload/software/2024/202402/20240227/Omada_SDN_Controller_v5.13.30.8_linux_aarch64.deb"
+omada_port: 8043
+
+motioneye_port: 8765

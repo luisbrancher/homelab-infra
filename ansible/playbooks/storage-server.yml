@@ -1,0 +1,89 @@
+---
+
+- name: Configurar storage-server
+  hosts: storage-server                # hosts do inventory que se aplica
+  become: true                         # sudo
+
+  pre_tasks:
+    # apt-get update
+    - name: Atualizar cache do apt
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600  # só atualiza se o cache tiver mais de 1h
+
+  # nfs
+  tasks:
+    - name: Instalar pacotes NFS
+      ansible.builtin.apt:
+        name: nfs-kernel-server
+        state: present
+
+    - name: Create a ext4 filesystem on storage_mount and check disk blocks
+      community.general.filesystem:
+        fstype: ext4
+        dev: "{{ storage_device }}"
+        opts: -cc
+
+    - name: Criar diretório de montagem 
+      ansible.builtin.mount: # equivalente a mount /dev/sdb /mnt/data + adiciona no /etc/fstab
+        path: "{{ storage_mount }}"
+        src: "{{ storage_device }}"
+        fstype: ext4
+        opts: defaults
+        state: mounted
+
+    - name: Criar diretórios de dados
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        mode: '0755'
+      loop: "{{ nfs_exports }}"
+
+    - name: Configurar e exportar via NFS (/etc/exports)
+      ansible.builtin.template:
+        src: templates/exports.j2
+        dest: /etc/exports
+      notify: Reload NFS
+
+    - name: Garantir que NFS está rodando no boot
+      ansible.builtin.service:
+        name: nfs-kernel-server
+        state: started
+        enabled: true      
+
+  # node exporter
+    - name: Instalar Node Exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: present
+
+    - name: Garantir que Node Exporter está rodando
+      ansible.builtin.service:
+        name: prometheus-node-exporter
+        state: started
+        enabled: true
+
+  # tailscale
+    - name: Baixar e rodar o script de instalação do Tailscale
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://tailscale.com/install.sh | sh
+        creates: /usr/bin/tailscale  # idempotência: só roda se o binário ainda não existir
+
+    - name: Conectar ao Tailscale com a auth key
+      ansible.builtin.command:
+        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
+        creates: /var/lib/tailscale/tailscaled.state  # idem — evita reconectar toda vez
+
+    - name: Garantir que o tailscaled está rodando no boot
+      ansible.builtin.service:
+        name: tailscaled
+        state: started
+        enabled: true 
+
+ # rodam no final se "notify" foi acionado
+  handlers:
+    - name: Reload NFS
+      ansible.builtin.service:
+        name: nfs-kernel-server
+        state: restarted
+
