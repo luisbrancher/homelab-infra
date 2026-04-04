@@ -68,9 +68,15 @@ variable "lxc_template" {
   type        = string
 }
 
-# onde guardar os discos das VMs
+# onde guardar as VMs
 variable "storage_pool" {
-  description = "Storage pool do Proxmox para os discos"
+  description = "Storage pool para discos das VMs (OS)"
   type        = string
   default     = "local-lvm"
+}
+
+variable "data_storage_pool" {
+  description = "Storage pool para dados (SSD SATA)"
+  type        = string
+  default     = "sata-pool"
 }

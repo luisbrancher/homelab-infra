@@ -16,7 +16,7 @@ resource "proxmox_vm_qemu" "storage_server" {
   disk {
     slot    = "scsi1"
     size    = "100G"
-    storage = var.storage_pool
+    storage = var.data_storage_pool
   }
 
   ipconfig0 = "ip=dhcp"
