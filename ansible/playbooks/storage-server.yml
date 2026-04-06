@@ -1,19 +1,19 @@
 ---
 
-- name: Configurar storage-server
+- name: Configure storage-server
   hosts: storage-server                # hosts do inventory que se aplica
   become: true                         # sudo
 
   pre_tasks:
     # apt-get update
-    - name: Atualizar cache do apt
+    - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 3600  # só atualiza se o cache tiver mais de 1h
 
   # nfs
   tasks:
-    - name: Instalar pacotes NFS
+    - name: Install NFS package
       ansible.builtin.apt:
         name: nfs-kernel-server
         state: present
@@ -24,7 +24,7 @@
         dev: "{{ storage_device }}"
         opts: -cc
 
-    - name: Criar diretório de montagem 
+    - name: Create mount directory
       ansible.builtin.mount: # equivalente a mount /dev/sdb /mnt/data + adiciona no /etc/fstab
         path: "{{ storage_mount }}"
         src: "{{ storage_device }}"
@@ -32,53 +32,53 @@
         opts: defaults
         state: mounted
 
-    - name: Criar diretórios de dados
+    - name: Create data directory
       ansible.builtin.file:
         path: "{{ item.path }}"
         state: directory
         mode: '0755'
       loop: "{{ nfs_exports }}"
 
-    - name: Configurar e exportar via NFS (/etc/exports)
+    - name: Config and export with NFS (/etc/exports)
       ansible.builtin.template:
         src: templates/exports.j2
         dest: /etc/exports
       notify: Reload NFS
 
-    - name: Garantir que NFS está rodando no boot
+    - name: Ensure NFS is running and enabled on boot
       ansible.builtin.service:
         name: nfs-kernel-server
         state: started
         enabled: true      
 
   # node exporter
-    - name: Instalar Node Exporter
+    - name: Install Node Exporter
       ansible.builtin.apt:
         name: prometheus-node-exporter
         state: present
 
-    - name: Garantir que Node Exporter está rodando
+    - name: Ensure Node Exporter is running and enabled on boot
       ansible.builtin.service:
         name: prometheus-node-exporter
         state: started
         enabled: true
 
   # tailscale
-    - name: Baixar e rodar o script de instalação do Tailscale
+    - name: Download and run Tailscale installation script
       ansible.builtin.shell:
         cmd: curl -fsSL https://tailscale.com/install.sh | sh
         creates: /usr/bin/tailscale  # idempotência: só roda se o binário ainda não existir
 
-    - name: Conectar ao Tailscale com a auth key
+    - name: Connect to Tailscale with auth key
       ansible.builtin.command:
         cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
         creates: /var/lib/tailscale/tailscaled.state  # idem — evita reconectar toda vez
 
-    - name: Garantir que o tailscaled está rodando no boot
+    - name: Ensure Tailscale is running and enabled on boot
       ansible.builtin.service:
         name: tailscaled
         state: started
-        enabled: true 
+        enabled: true
 
  # rodam no final se "notify" foi acionado
   handlers:

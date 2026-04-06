@@ -1,12 +1,12 @@
 ---
 
-- name: Configurar pi4
+- name: Configure pi4
   hosts: pi4                # hosts do inventory que se aplica
   become: true                   # sudo
 
   pre_tasks:
     # apt-get update
-    - name: Atualizar cache do apt
+    - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 3600  # só atualiza se o cache tiver mais de 1h
@@ -14,31 +14,31 @@
 
   tasks:
     # omada controller
-    - name: Instalar dependências do Omada
+    - name: Install Omada dependencies
       ansible.builtin.apt:
         name:
           - openjdk-17-jre-headless
           - jsvc
         state: present
 
-    - name: Baixar pacote do Omada Controller
+    - name: Download Omada Controller package
       ansible.builtin.get_url:
         url: "{{ omada_download_url }}"
         dest: /tmp/omada.deb
 
-    - name: Instalar Omada Controller
+    - name: Install Omada Controller
       ansible.builtin.apt:
         deb: /tmp/omada.deb
         state: present
 
-    - name: Garantir que o omada está rodando no boot
+    - name: Ensure Omada Controller is running and enabled on boot
       ansible.builtin.service:
         name: omada-controller
         state: started
         enabled: true
 
     # motioneye
-    - name: Instalar dependências do MotionEye
+    - name: Install MotionEye dependencies
       ansible.builtin.apt:
         name:
           - motion
@@ -46,41 +46,41 @@
           - python3-dev
         state: present
 
-    - name: Instalar MotionEye via pip
+    - name: Install MotionEye with pip
       ansible.builtin.pip:
         name: motioneye
         state: present
 
-    - name: Garantir que o motioneye está rodando no boot
+    - name: Ensure MotionEye is running and enabled on boot
       ansible.builtin.service:
         name: motioneye
         state: started
         enabled: true
 
   # node exporter
-    - name: Instalar Node Exporter
+    - name: Install Node Exporter
       ansible.builtin.apt:
         name: prometheus-node-exporter
         state: present
 
-    - name: Garantir que Node Exporter está rodando
+    - name: Ensure Node Exporter is running and enabled on boot
       ansible.builtin.service:
         name: prometheus-node-exporter
         state: started
         enabled: true
 
   # tailscale
-    - name: Baixar e rodar o script de instalação do Tailscale
+    - name: Download and run Tailscale installation script
       ansible.builtin.shell:
         cmd: curl -fsSL https://tailscale.com/install.sh | sh
         creates: /usr/bin/tailscale  # idempotência: só roda se o binário ainda não existir
 
-    - name: Conectar ao Tailscale com a auth key
+    - name: Connect to Tailscale with auth key
       ansible.builtin.command:
         cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
         creates: /var/lib/tailscale/tailscaled.state  # idem — evita reconectar toda vez
 
-    - name: Garantir que o tailscaled está rodando no boot
+    - name: Ensure Tailscale is running and enabled on boot
       ansible.builtin.service:
         name: tailscaled
         state: started

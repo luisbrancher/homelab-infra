@@ -1,53 +1,76 @@
 ---
 
-- name: Configurar k3s-node
+- name: Configure k3s-node
   hosts: k3s-node                # hosts do inventory que se aplica
   become: true                   # sudo
 
   pre_tasks:
     # apt-get update
-    - name: Atualizar cache do apt
+    - name: Update apt cache
       ansible.builtin.apt:
         update_cache: true
         cache_valid_time: 3600  # só atualiza se o cache tiver mais de 1h
 
 
   tasks:
-    - name: Baixar e rodar o script de instalação do k3s
+    - name: Download and run k3s installation script
       ansible.builtin.shell:
         cmd: curl -fsSL https://get.k3s.io | sh
         creates: /usr/local/bin/k3s  # idempotência: só roda se o binário ainda não existir
 
-    - name: Garantir que o k3s está rodando no boot
+    - name: Ensure k3s is running and enabled on boot
       ansible.builtin.service:
         name: k3s
         state: started
         enabled: true     
 
+    - name: Wait for k3s to be ready
+      ansible.builtin.wait_for:
+        path: /var/lib/rancher/k3s/server/node-token
+        timeout: 60
+
+  # argoCD
+    - name: Check if ArgoCD namespace exists
+      ansible.builtin.command:
+        cmd: kubectl get namespace argocd
+      register: argocd_namespace
+      failed_when: false
+      changed_when: false
+
+    - name: Create ArgoCD namespace
+      ansible.builtin.command:
+        cmd: kubectl create namespace argocd
+      when: argocd_namespace.rc != 0
+
+    - name: Install ArgoCD
+      ansible.builtin.command:
+        cmd: kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+      when: argocd_namespace.rc != 0
+
   # node exporter
-    - name: Instalar Node Exporter
+    - name: Install Node Exporter
       ansible.builtin.apt:
         name: prometheus-node-exporter
         state: present
 
-    - name: Garantir que Node Exporter está rodando
+    - name: Ensure Node Exporter is running and enabled on boot
       ansible.builtin.service:
         name: prometheus-node-exporter
         state: started
         enabled: true
 
   # tailscale
-    - name: Baixar e rodar o script de instalação do Tailscale
+    - name: Download and run Tailscale installation script
       ansible.builtin.shell:
         cmd: curl -fsSL https://tailscale.com/install.sh | sh
         creates: /usr/bin/tailscale  # idempotência: só roda se o binário ainda não existir
 
-    - name: Conectar ao Tailscale com a auth key
+    - name: Connect to Tailscale with auth key
       ansible.builtin.command:
         cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
         creates: /var/lib/tailscale/tailscaled.state  # idem — evita reconectar toda vez
 
-    - name: Garantir que o tailscaled está rodando no boot
+    - name: Ensure Tailscale is running and enabled on boot
       ansible.builtin.service:
         name: tailscaled
         state: started
