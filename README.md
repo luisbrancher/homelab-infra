@@ -27,7 +27,8 @@ Proxmox (i5 1345U)
 
 Pi4
 ├── Omada Controller    → AP management
-└── MotionEye           → cameras
+├── MotionEye           → cameras
+└── UpSnap              → Wake-on-LAN
 ```
 
 ### k3s-node
@@ -54,8 +55,9 @@ Runs outside k3s intentionally — survives restarts of the main VM.
 
 ### Pi4
 Dedicated hardware for network and camera services, managed via Ansible.
-- **Omada Controller** — TP-Link AP management (Docker, ARM image)
-- **MotionEye** — camera monitoring (bare metal via apt)
+- **Omada Controller** — TP-Link AP management (bare metal, .deb package)
+- **MotionEye** — camera monitoring (bare metal via pip)
+- **UpSnap** — Wake-on-LAN (bare metal, NFS-backed data on storage-server)
 
 ### VPN
 - **Tailscale** — installed via Ansible on the OS of every homelab machine
@@ -85,11 +87,12 @@ homelab-infra/
         ├── monitoring.yml        → Prometheus + Grafana + Loki + Tailscale
         ├── pi4.yml               → Omada + MotionEye + Tailscale + Node Exporter
         └── templates/
-            ├── exports.j2        → /etc/exports (NFS)
-            ├── prometheus.yml.j2 → Prometheus scrape config
-            ├── grafana.ini.j2    → Grafana config
-            ├── loki-config.j2    → Loki config
-            └── loki.service.j2   → Loki systemd service
+             ├── exports.j2            → /etc/exports (NFS)
+             ├── prometheus.yml.j2     → Prometheus scrape config
+             ├── grafana.ini.j2        → Grafana config
+             ├── loki-config.j2        → Loki config
+             ├── loki.service.j2       → Loki systemd service
+             └── upsnap.service.j2     → UpSnap systemd service
 ```
 
 ## Prerequisites
