@@ -13,6 +13,13 @@
 
 
   tasks:
+  # NFS client
+    - name: Install NFS client
+      ansible.builtin.apt:
+        name: nfs-common
+        state: present
+
+  # k3s
     - name: Download and run k3s installation script
       ansible.builtin.shell:
         cmd: curl -fsSL https://get.k3s.io | sh
