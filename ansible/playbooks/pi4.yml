@@ -57,6 +57,57 @@
         state: started
         enabled: true
 
+    # nfs client
+    - name: Install NFS client
+      ansible.builtin.apt:
+        name: nfs-common
+        state: present
+
+    # upsnap
+    - name: Create UpSnap NFS mount point
+      ansible.builtin.file:
+        path: /mnt/data/upsnap
+        state: directory
+        mode: '0755'
+
+    - name: Mount NFS upsnap share
+      ansible.posix.mount:
+        path: /mnt/data/upsnap
+        src: "{{ nfs_server }}:/mnt/data/upsnap"
+        fstype: nfs
+        opts: defaults,_netdev
+        state: mounted
+
+    - name: Download UpSnap binary
+      ansible.builtin.get_url:
+        url: "https://github.com/seriousm4x/UpSnap/releases/download/v{{ upsnap_version }}/upsnap_{{ upsnap_version }}_linux_arm64.zip"
+        dest: /tmp/upsnap.zip
+
+    - name: Unzip UpSnap binary
+      ansible.builtin.unarchive:
+        src: /tmp/upsnap.zip
+        dest: /usr/local/bin/
+        remote_src: true
+        creates: /usr/local/bin/upsnap
+
+    - name: Ensure UpSnap binary is executable
+      ansible.builtin.file:
+        path: /usr/local/bin/upsnap
+        mode: '0755'
+
+    - name: Deploy UpSnap systemd service
+      ansible.builtin.template:
+        src: templates/upsnap.service.j2
+        dest: /etc/systemd/system/upsnap.service
+      notify: Restart UpSnap
+      
+    - name: Ensure UpSnap is running and enabled on boot
+      ansible.builtin.service:
+        name: upsnap
+        state: started
+        enabled: true
+        daemon_reload: true
+
   # node exporter
     - name: Install Node Exporter
       ansible.builtin.apt:
@@ -85,3 +136,9 @@
         name: tailscaled
         state: started
         enabled: true
+
+  handlers:
+      - name: Restart UpSnap
+        ansible.builtin.service:
+          name: upsnap
+          state: restarted        
