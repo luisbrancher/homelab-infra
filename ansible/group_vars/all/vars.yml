@@ -26,14 +26,19 @@ nfs_exports:
     clients: "{{ k3s_node_ip }}"
     options: rw,sync,no_subtree_check
   - path: /mnt/data/upsnap
-    clients: "{{ k3s_node_ip }}"
+    clients: "{{ pi4_ip }}"
     options: rw,sync,no_subtree_check
   - path: /mnt/data/backups
     clients: "{{ k3s_node_ip }}"
     options: rw,sync,no_subtree_check
 
 # pi4
+pi4_ip: "{{ hostvars['pi4']['ansible_host'] }}"
+
 omada_download_url: "https://static.tp-link.com/upload/software/2024/202402/20240227/Omada_SDN_Controller_v5.13.30.8_linux_aarch64.deb"
 omada_port: 8043
+
+upsnap_version: "4.3.1"
+upsnap_port: 8090
 
 motioneye_port: 8765
