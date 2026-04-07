@@ -1,0 +1,12 @@
+[Unit]
+Description=UpSnap Wake-on-LAN
+After=network.target mnt-data-upsnap.mount
+Requires=mnt-data-upsnap.mount
+
+[Service]
+ExecStart=/usr/local/bin/upsnap serve --http=0.0.0.0:{{ upsnap_port }} --dir=/mnt/data/upsnap
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
