@@ -14,7 +14,8 @@ resource "proxmox_vm_qemu" "storage_server" {
   }
 
   disk {
-    slot    = "scsi1"
+    type    = "scsi"
+    slot    = 1
     size    = "100G"
     storage = var.data_storage_pool
   }

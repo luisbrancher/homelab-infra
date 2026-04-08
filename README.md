@@ -69,11 +69,10 @@ homelab-infra/
 ├── terraform/
 │   ├── main.tf                   → terraform block + proxmox provider
 │   ├── variables.tf              → all variables centralized
-│   ├── outputs.tf                → VM IPs after apply
-│   └── vms/
-│       ├── k3s-node.tf
-│       ├── storage-server.tf
-│       └── monitoring.tf
+│   ├── outputs.tf                → VM IPs after apply 
+│   ├── vm_k3s-node.tf
+│   ├── vm_storage-server.tf
+│   └── lxc_monitoring.tf
 └── ansible/
     ├── inventory.ini             → hosts and groups
     ├── site.yml                  → main entrypoint, imports all playbooks
