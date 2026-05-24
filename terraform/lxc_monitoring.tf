@@ -1,7 +1,8 @@
 resource "proxmox_virtual_environment_container" "monitoring" {
-  description = "Managed by Terraform."
-  node_name   = var.proxmox_node
-  vm_id       = 120
+  unprivileged = true
+  description  = "Managed by Terraform."
+  node_name    = var.proxmox_node
+  vm_id        = 120
 
   initialization {
     hostname = var.monitoring_server
