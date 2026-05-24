@@ -1,11 +1,11 @@
 output "ip_storage_server" {
   description = "IP from storage-server"
-  value       = try(proxmox_virtual_environment_vm.storage_server.ipv4_addresses[0][0], "dhcp - check proxmox UI")
+  value       = try(proxmox_virtual_environment_vm.storage_server.ipv4_addresses[1][0], "dhcp - check proxmox UI")
 }
 
 output "ip_k3s_server" {
   description = "IP from k3s-node"
-  value       = try(proxmox_virtual_environment_vm.k3s_node.ipv4_addresses[0][0], "dhcp - check proxmox UI")
+  value       = try(proxmox_virtual_environment_vm.k3s_node.ipv4_addresses[1][0], "dhcp - check proxmox UI")
 }
 
 output "ip_monitoring_server" {
