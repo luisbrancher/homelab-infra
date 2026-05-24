@@ -39,4 +39,8 @@ resource "proxmox_virtual_environment_container" "monitoring" {
     template_file_id = var.lxc_template
     type             = "debian"
   }
+
+  features {
+    nesting = true
+}
 }
