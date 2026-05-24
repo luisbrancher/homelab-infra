@@ -53,10 +53,10 @@ variable "network_bridge" {
   default     = "vmbr0"
 }
 
-variable "vm_template" {
-  description = "Template base para clone das VMs"
-  type        = string
-  default     = "debian-13-template"
+variable "vm_template_id" {
+  description = "VM ID do template base para clone"
+  type        = number
+  default     = 9000
 }
 
 variable "lxc_template" {

@@ -1,23 +1,42 @@
-resource "proxmox_lxc" "monitoring" {
-  hostname    = var.monitoring_server
-  target_node = var.proxmox_node
-  vmid        = 120
+resource "proxmox_virtual_environment_container" "monitoring" {
+  description = "Managed by Terraform."
+  node_name   = var.proxmox_node
+  vm_id       = 120
 
-  ostemplate = var.lxc_template
+  initialization {
+    hostname = var.monitoring_server
 
-  cores  = 2
-  memory = 1024
+    ip_config {
+      ipv4 {
+        address = "dhcp"
+      }
+    }
 
-  network {
+    user_account {
+      keys = [var.ssh_public_key]
+    }
+  }
+
+  cpu {
+    cores = 2
+  }
+
+  memory {
+    dedicated = 1024
+  }
+
+  disk {
+    datastore_id = var.storage_pool
+    size         = 20
+  }
+
+  network_interface {
     name   = "eth0"
     bridge = var.network_bridge
-    ip     = "dhcp"
   }
 
-  rootfs {
-    size    = "20G"
-    storage = var.storage_pool
+  operating_system {
+    template_file_id = var.lxc_template
+    type             = "debian"
   }
-
-  ssh_public_keys = var.ssh_public_key
 }
