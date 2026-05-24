@@ -23,6 +23,7 @@ resource "proxmox_vm_qemu" "storage_server" {
   }
 
   network {
+    id     = 0
     bridge = var.network_bridge
     model  = "virtio"
   }
