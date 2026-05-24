@@ -43,7 +43,7 @@ Planned services:
 - Cert-manager
 
 ### storage-server
-VM dedicated to storage. Exports NFS volumes mounted by k3s-node to persist service data. Additional 100GB disk separate from the OS disk. Does not run any application services.
+VM dedicated to storage. Exports NFS volumes mounted by k3s-node to persist service data. Additional 800GB disk separate from the OS disk. Does not run any application services.
 
 ### lxc-monitoring
 Lightweight LXC container running the observability stack:
@@ -97,8 +97,8 @@ homelab-infra/
 ## Prerequisites
 
 - Proxmox installed on hardware (manual install via ISO)
-- Debian 12 VM template created on Proxmox (`vm_template`)
-- Debian 12 LXC template available on Proxmox (`lxc_template`)
+- Debian 13 VM template created on Proxmox (`vm_template`)
+- Debian 13 LXC template available on Proxmox (`lxc_template`)
 - HCP Terraform configured with sensitive variables
 - Debian ARM installed on Pi4
 
@@ -124,7 +124,7 @@ terraform output ip_monitoring_server
 Update ansible/inventory.ini with the IPs from Terraform outputs, then:
 
 ```bash
-bashcd ansible
+cd ansible
 
 # run everything
 ansible-playbook site.yml
@@ -138,7 +138,7 @@ ansible-playbook playbooks/monitoring.yml
 Sensitive variables are managed via Ansible Vault:
 
 ```bash
-bashansible-vault edit group_vars/all/vault.yml
+ansible-vault edit group_vars/all/vault.yml
 ansible-playbook site.yml --ask-vault-pass
 ```
 
@@ -146,5 +146,5 @@ ansible-playbook site.yml --ask-vault-pass
 
 - [x] Terraform for Proxmox VM provisioning
 - [x] Ansible for VM OS configuration + Tailscale + Pi services + NFS setup
-- [ ] Service deployment via k3s manifests
-- [ ] GitOps with ArgoCD
+- [x] Service deployment via k3s manifests (https://github.com/luisbrancher/homelab-gitops)
+- [x] GitOps with ArgoCD (https://github.com/luisbrancher/homelab-gitops)
