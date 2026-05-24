@@ -1,7 +1,7 @@
 resource "proxmox_lxc" "monitoring" {
   hostname    = var.monitoring_server
   target_node = var.proxmox_node
-  vmid        = 9020
+  vmid        = 120
 
   ostemplate = var.lxc_template
 
@@ -19,5 +19,5 @@ resource "proxmox_lxc" "monitoring" {
     storage = var.storage_pool
   }
 
-  ssh_public_keys = var.ssh_public_key_homelab
+  ssh_public_keys = var.ssh_public_key
 }
