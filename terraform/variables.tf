@@ -1,18 +1,24 @@
 # auth variables
-variable "proxmox_api_url" {
-  description = "URL do Proxmox"
+variable "pm_api_url" {
+  description = "URL da API do Proxmox"
   type        = string
 }
 
-variable "proxmox_user" {
-  description = "Proxmox user"
+variable "pm_api_token_id" {
+  description = "Token ID do Proxmox (ex: terraform@pve!terraform-token)"
   type        = string
 }
 
-variable "proxmox_password" {
-  description = "Proxmox Password"
+variable "pm_api_token_secret" {
+  description = "Token secret do Proxmox"
   type        = string
   sensitive   = true
+}
+
+# SSH key
+variable "ssh_public_key" {
+  description = "ED25519 public key for SSH access"
+  type        = string
 }
 
 # VMs names
@@ -34,41 +40,31 @@ variable "k3s_server" {
   default     = "k3s-node"
 }
 
-# SSH key
-variable "ssh_public_key_homelab" {
-  description = "ED25519 public key for SSH access"
-  type        = string
-}
-
 # infra variables
-# ---------------
-# qual node do Proxmox criar a VM = pve
 variable "proxmox_node" {
   description = "Nome do node Proxmox"
   type        = string
   default     = "pve"
 }
 
-# qual interface de rede usar (vmbr0 é o padrão do Proxmox)
 variable "network_bridge" {
   description = "Bridge de rede do Proxmox"
   type        = string
   default     = "vmbr0"
 }
 
-# qual imagem base clonar pra criar a VM
 variable "vm_template" {
   description = "Template base para clone das VMs"
   type        = string
+  default     = "debian-13-template"
 }
 
-# qual imagem base clonar pra criar a LXC
 variable "lxc_template" {
   description = "Template base para clone da LXC"
   type        = string
+  default     = "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
 }
 
-# onde guardar as VMs
 variable "storage_pool" {
   description = "Storage pool para discos das VMs (OS)"
   type        = string
@@ -78,5 +74,5 @@ variable "storage_pool" {
 variable "data_storage_pool" {
   description = "Storage pool para dados (SSD SATA)"
   type        = string
-  default     = "sata-pool"
+  default     = "data-sata"
 }
