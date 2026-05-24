@@ -24,13 +24,6 @@ resource "proxmox_vm_qemu" "storage_server" {
     storage = var.data_storage_pool
   }
 
-  disk {
-    type    = "disk"
-    slot    = "scsi1"
-    size    = "800G"
-    storage = var.data_storage_pool
-  }
-
   ipconfig0 = "ip=dhcp"
   sshkeys = var.ssh_public_key
 }
