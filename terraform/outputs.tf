@@ -10,5 +10,5 @@ output "ip_k3s_server" {
 
 output "ip_monitoring_server" {
   description = "IP from monitoring-server"
-  value       = try(proxmox_container.monitoring.initialization[0].ip_config[0].ipv4[0].address, "dhcp - check proxmox UI")
+  value       = try(proxmox_virtual_environment_container.monitoring.initialization[0].ip_config[0].ipv4[0].address, "dhcp - check proxmox UI")
 }
