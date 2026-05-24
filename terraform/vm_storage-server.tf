@@ -5,27 +5,30 @@ resource "proxmox_vm_qemu" "storage_server" {
 
   clone = var.vm_template
 
-  cores  = 2
+  cpu {
+    cores = 2
+  }
   memory = 2048
 
   disk {
-    type    = "scsi"
-    slot    = 0
+    type    = "disk"
+    slot    = "scsi0"
     size    = "31G"
     storage = var.storage_pool
   }
 
   disk {
-    type    = "scsi"
-    slot    = 1
+    type    = "disk"
+    slot    = "scsi1"
     size    = "800G"
     storage = var.data_storage_pool
   }
 
-  network {
-    id     = 0
-    bridge = var.network_bridge
-    model  = "virtio"
+  disk {
+    type    = "disk"
+    slot    = "scsi1"
+    size    = "800G"
+    storage = var.data_storage_pool
   }
 
   ipconfig0 = "ip=dhcp"

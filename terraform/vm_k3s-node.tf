@@ -5,12 +5,14 @@ resource "proxmox_vm_qemu" "k3s_node" {
 
   clone = var.vm_template
 
-  cores   = 4       
+  cpu {
+    cores = 4
+  }  
   memory  = 8192
 
   disk {
-    type    = "scsi"
-    slot    = 0
+    type    = "disk"
+    slot    = "scsi0"
     size    = "50G"
     storage = var.storage_pool
   }
