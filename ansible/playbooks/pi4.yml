@@ -11,32 +11,7 @@
         update_cache: true
         cache_valid_time: 3600  # só atualiza se o cache tiver mais de 1h
 
-
   tasks:
-    # omada controller
-    - name: Install Omada dependencies
-      ansible.builtin.apt:
-        name:
-          - openjdk-17-jre-headless
-          - jsvc
-        state: present
-
-    - name: Download Omada Controller package
-      ansible.builtin.get_url:
-        url: "{{ omada_download_url }}"
-        dest: /tmp/omada.deb
-
-    - name: Install Omada Controller
-      ansible.builtin.apt:
-        deb: /tmp/omada.deb
-        state: present
-
-    - name: Ensure Omada Controller is running and enabled on boot
-      ansible.builtin.service:
-        name: omada-controller
-        state: started
-        enabled: true
-
     # motioneye
     - name: Install MotionEye dependencies
       ansible.builtin.apt:
@@ -49,13 +24,43 @@
     - name: Install MotionEye with pip
       ansible.builtin.pip:
         name: motioneye
+        extra_args: --break-system-packages
         state: present
+
+    - name: Create MotionEye config directory
+      ansible.builtin.file:
+        path: /etc/motioneye
+        state: directory
+        mode: '0755'
+
+    - name: Copy MotionEye default config
+      ansible.builtin.shell:
+        cmd: motioneye_init
+        creates: /etc/motioneye/motioneye.conf
+
+    - name: Create MotionEye systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/motioneye.service
+        content: |
+          [Unit]
+          Description=motionEye Server
+          After=network.target
+
+          [Service]
+          ExecStart=/usr/local/bin/meyectl startserver -c /etc/motioneye/motioneye.conf
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+      notify: Restart MotionEye
 
     - name: Ensure MotionEye is running and enabled on boot
       ansible.builtin.service:
         name: motioneye
         state: started
         enabled: true
+        daemon_reload: true
 
     # nfs client
     - name: Install NFS client
@@ -80,7 +85,7 @@
 
     - name: Download UpSnap binary
       ansible.builtin.get_url:
-        url: "https://github.com/seriousm4x/UpSnap/releases/download/v{{ upsnap_version }}/upsnap_{{ upsnap_version }}_linux_arm64.zip"
+        url: "https://github.com/seriousm4x/UpSnap/releases/download/5.3.1/UpSnap_5.3.1_linux_arm64.zip"
         dest: /tmp/upsnap.zip
 
     - name: Unzip UpSnap binary
@@ -120,16 +125,81 @@
         state: started
         enabled: true
 
+    # docker
+    - name: Install Docker dependencies
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+        state: present
+
+    - name: Create keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Docker GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Add Docker repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/docker.list
+        content: "deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian trixie stable\n"
+        mode: '0644'
+
+    - name: Install Docker
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        update_cache: true
+        state: present
+
+    - name: Ensure Docker is running and enabled on boot
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    # omada
+    - name: Install docker-compose plugin
+      ansible.builtin.apt:
+        name: docker-compose-plugin
+        state: present
+
+    - name: Create Omada data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - /opt/omada
+        - /opt/omada/data
+        - /opt/omada/logs
+
+    - name: Deploy Omada docker-compose file
+      ansible.builtin.template:
+        src: templates/omada-compose.yml.j2
+        dest: /opt/omada/docker-compose.yml
+        mode: '0644'
+
+    - name: Start Omada container
+      ansible.builtin.command:
+        cmd: docker compose up -d
+        chdir: /opt/omada
+      register: compose_up
+      changed_when: "'Started' in compose_up.stdout or 'Created' in compose_up.stdout"
+
   # tailscale
     - name: Download and run Tailscale installation script
       ansible.builtin.shell:
         cmd: curl -fsSL https://tailscale.com/install.sh | sh
         creates: /usr/bin/tailscale  # idempotência: só roda se o binário ainda não existir
-
-    - name: Connect to Tailscale with auth key
-      ansible.builtin.command:
-        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
-        creates: /var/lib/tailscale/tailscaled.state  # idem — evita reconectar toda vez
 
     - name: Ensure Tailscale is running and enabled on boot
       ansible.builtin.service:
@@ -137,7 +207,19 @@
         state: started
         enabled: true
 
+    - name: Connect to Tailscale with auth key
+      ansible.builtin.command:
+        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
+      register: tailscale_up
+      changed_when: tailscale_up.rc == 0
+
+
   handlers:
+      - name: Restart MotionEye
+        ansible.builtin.service:
+          name: motioneye
+          state: restarted
+
       - name: Restart UpSnap
         ansible.builtin.service:
           name: upsnap
