@@ -1,0 +1,19 @@
+services:
+  omada-controller:
+    image: mbentley/omada-controller:latest
+    container_name: omada-controller
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - TZ=America/Sao_Paulo
+      - MANAGE_HTTPS_PORT={{ omada_port }}
+    volumes:
+      - /opt/omada/data:/opt/tplink/EAPController/data
+      - /opt/omada/logs:/opt/tplink/EAPController/logs
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2048M
+        reservations:
+          memory: 512M
