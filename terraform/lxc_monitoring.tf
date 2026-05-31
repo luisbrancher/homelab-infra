@@ -43,5 +43,7 @@ resource "proxmox_virtual_environment_container" "monitoring" {
 
   features {
     nesting = true
+    keyctl = true # requer root@pam no Proxmox; update in-place via API falha com 403 - aplicar manualmente com: pct set 120 -features nesting=1,keyctl=1
+    # tun requer configuração manual: echo "lxc.cgroup2.devices.allow: c 10:200 rwm" >> /etc/pve/lxc/120.conf && echo "lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file" >> /etc/pve/lxc/120.conf
 }
 }
