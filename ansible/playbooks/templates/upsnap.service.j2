@@ -4,6 +4,7 @@ After=network.target mnt-data-upsnap.mount
 Requires=mnt-data-upsnap.mount
 
 [Service]
+Environment=HOME=/root
 ExecStart=/usr/local/bin/upsnap serve --http=0.0.0.0:{{ upsnap_port }} --dir=/mnt/data/upsnap
 Restart=always
 RestartSec=5
