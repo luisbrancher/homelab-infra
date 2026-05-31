@@ -26,7 +26,7 @@ Proxmox (i5 1345U)
 └── LXC: lxc-monitoring → Prometheus + Grafana + Loki
 
 Pi4
-├── Omada Controller    → AP management
+├── Omada Controller    → AP management (docker)
 ├── MotionEye           → cameras
 └── UpSnap              → Wake-on-LAN
 ```
@@ -55,7 +55,7 @@ Runs outside k3s intentionally — survives restarts of the main VM.
 
 ### Pi4
 Dedicated hardware for network and camera services, managed via Ansible.
-- **Omada Controller** — TP-Link AP management (bare metal, .deb package)
+- **Omada Controller** — TP-Link AP management (Docker, mbentley/omada-controller)
 - **MotionEye** — camera monitoring (bare metal via pip)
 - **UpSnap** — Wake-on-LAN (bare metal, NFS-backed data on storage-server)
 
@@ -74,6 +74,7 @@ homelab-infra/
 │   ├── vm_storage-server.tf
 │   └── lxc_monitoring.tf
 └── ansible/
+    ├── ansible.cfg               → Ansible configuration
     ├── inventory.ini             → hosts and groups
     ├── site.yml                  → main entrypoint, imports all playbooks
     ├── group_vars/all/
@@ -86,6 +87,7 @@ homelab-infra/
         ├── monitoring.yml        → Prometheus + Grafana + Loki + Tailscale
         ├── pi4.yml               → Omada + MotionEye + Tailscale + Node Exporter
         └── templates/
+             ├── omada-compose.yml.j2  → Omada docker-compose
              ├── exports.j2            → /etc/exports (NFS)
              ├── prometheus.yml.j2     → Prometheus scrape config
              ├── grafana.ini.j2        → Grafana config
@@ -100,7 +102,7 @@ homelab-infra/
 - Debian 13 VM template created on Proxmox (`vm_template`)
 - Debian 13 LXC template available on Proxmox (`lxc_template`)
 - HCP Terraform configured with sensitive variables
-- Debian ARM installed on Pi4
+- Raspberry Pi OS (Debian 13) installed on Pi4
 
 ## Usage
 
