@@ -15,21 +15,32 @@
   tasks:
     - name: Install NFS package
       ansible.builtin.apt:
-        name: nfs-kernel-server
+        name:
+          - nfs-kernel-server
+          - nfs-common
+          - btrfs-progs
         state: present
 
-    - name: Create a ext4 filesystem on storage_mount and check disk blocks
+    - name: Create btrfs filesystem on storage device
       community.general.filesystem:
-        fstype: ext4
+        fstype: btrfs
         dev: "{{ storage_device }}"
-        opts: -cc
+        opts: "-L data-sata"
+        force: false # não formata se já existir
+      when: ansible_mounts | selectattr('device', 'equalto', storage_device) | list | length == 0
 
-    - name: Create mount directory
-      ansible.builtin.mount: # equivalente a mount /dev/sdb /mnt/data + adiciona no /etc/fstab
+    - name: Get UUID of storage device
+      ansible.builtin.command:
+        cmd: blkid -s UUID -o value {{ storage_device }}
+      register: storage_uuid
+      changed_when: false
+
+    - name: Mount storage with btrfs options via fstab
+      ansible.builtin.mount:
         path: "{{ storage_mount }}"
-        src: "{{ storage_device }}"
-        fstype: ext4
-        opts: defaults
+        src: "UUID={{ storage_uuid.stdout }}"
+        fstype: btrfs
+        opts: defaults,compress=zstd,noatime
         state: mounted
 
     - name: Create data directory
@@ -69,16 +80,17 @@
         cmd: curl -fsSL https://tailscale.com/install.sh | sh
         creates: /usr/bin/tailscale  # idempotência: só roda se o binário ainda não existir
 
-    - name: Connect to Tailscale with auth key
-      ansible.builtin.command:
-        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
-        creates: /var/lib/tailscale/tailscaled.state  # idem — evita reconectar toda vez
-
     - name: Ensure Tailscale is running and enabled on boot
       ansible.builtin.service:
         name: tailscaled
         state: started
         enabled: true
+
+    - name: Connect to Tailscale with auth key
+      ansible.builtin.command:
+        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
+      register: tailscale_up
+      changed_when: tailscale_up.rc == 0
 
  # rodam no final se "notify" foi acionado
   handlers:
