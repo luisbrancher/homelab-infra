@@ -18,18 +18,27 @@
         - curl
         - wget
         - net-tools
+        - unzip
         state: present
       
     # grafana
+    - name: Create keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
     - name: Add GPG key for Grafana
-      ansible.builtin.apt_key:
+      ansible.builtin.get_url:
         url: https://apt.grafana.com/gpg.key
-        state: present
+        dest: /etc/apt/keyrings/grafana.asc
+        mode: '0644'
 
     - name: Add Grafana repository
-      ansible.builtin.apt_repository:
-        repo: "deb https://apt.grafana.com stable main"
-        state: present
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/grafana.list
+        content: "deb [signed-by=/etc/apt/keyrings/grafana.asc] https://apt.grafana.com stable main\n"
+        mode: '0644'
 
     - name: Install Grafana
       ansible.builtin.apt:
@@ -78,6 +87,12 @@
         remote_src: true
         mode: '0755'
 
+    - name: Create Loki symlink
+      ansible.builtin.file:
+        src: /usr/local/bin/loki-linux-amd64
+        dest: /usr/local/bin/loki
+        state: link
+
     - name: Create data directorys for Loki
       ansible.builtin.file:
         path: "{{ item }}"
@@ -89,6 +104,7 @@
         - /var/loki/index
         - /var/loki/cache
         - /var/loki/chunks
+        - /var/loki/wal
 
     - name: Copy Loki config
       ansible.builtin.template:
@@ -102,7 +118,7 @@
       ansible.builtin.template:
         src: templates/loki.service.j2
         dest: /etc/systemd/system/loki.service
-      notify: Habilitar e iniciar Loki
+      notify: Enable and start Loki
 
     - name: Ensure services are running and enabled on boot
       ansible.builtin.service:
@@ -126,22 +142,23 @@
         state: started
         enabled: true
 
-  # tailscale
+    # tailscale
     - name: Download and run Tailscale installation script
       ansible.builtin.shell:
         cmd: curl -fsSL https://tailscale.com/install.sh | sh
-        creates: /usr/bin/tailscale  # idempotência: só roda se o binário ainda não existir
-
-    - name: Connect to Tailscale with auth key
-      ansible.builtin.command:
-        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
-        creates: /var/lib/tailscale/tailscaled.state  # idem — evita reconectar toda vez
+        creates: /usr/bin/tailscale
 
     - name: Ensure Tailscale is running and enabled on boot
       ansible.builtin.service:
         name: tailscaled
         state: started
         enabled: true
+
+    - name: Connect to Tailscale with auth key
+      ansible.builtin.command:
+        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
+      register: tailscale_up
+      changed_when: tailscale_up.rc == 0
 
   handlers:
     - name: Enable and start Loki
