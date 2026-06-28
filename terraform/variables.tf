@@ -22,12 +22,6 @@ variable "ssh_public_key" {
 }
 
 # VMs names
-variable "storage_server" {
-  description = "Used for tagging and naming resources"
-  type        = string
-  default     = "storage-server"
-}
-
 variable "monitoring_server" {
   description = "Used for tagging and naming resources"
   type        = string
@@ -69,10 +63,4 @@ variable "storage_pool" {
   description = "Storage pool para discos das VMs (OS)"
   type        = string
   default     = "local-lvm"
-}
-
-variable "data_storage_pool" {
-  description = "Storage pool para dados (SSD SATA)"
-  type        = string
-  default     = "data-sata"
 }
