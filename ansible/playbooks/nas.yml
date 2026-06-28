@@ -1,0 +1,23 @@
+---
+
+- name: Configure TrueNAS
+  hosts: nas
+  become: true
+
+  tasks:
+    - name: Download and run Tailscale installation script
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://tailscale.com/install.sh | sh
+        creates: /usr/bin/tailscale
+
+    - name: Ensure Tailscale is running and enabled on boot
+      ansible.builtin.service:
+        name: tailscaled
+        state: started
+        enabled: true
+
+    - name: Connect to Tailscale with auth key
+      ansible.builtin.command:
+        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
+      register: tailscale_up
+      changed_when: tailscale_up.rc == 0
