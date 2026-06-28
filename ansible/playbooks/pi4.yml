@@ -78,7 +78,7 @@
     - name: Mount NFS upsnap share
       ansible.posix.mount:
         path: /mnt/data/upsnap
-        src: "{{ nfs_server }}:/mnt/data/upsnap"
+        src: "{{ nfs_server }}:/mnt/data-ssd/upsnap"
         fstype: nfs
         opts: defaults,_netdev
         state: mounted
