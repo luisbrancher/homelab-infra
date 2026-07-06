@@ -21,9 +21,11 @@ N150
 └── OPNsense bare metal → router, firewall, VLANs
 
 Proxmox (i5 1345U)
-├── VM: k3s-node        → main services
-├── VM: storage-server  → NFS, backups
+├── VM: k3s-node        → 8 cores, 16GB RAM, 50GB + 220GB (media-ssd) disk — main services
 └── LXC: lxc-monitoring → Prometheus + Grafana + Loki
+
+NAS (TrueNAS)
+└── Lenovo V50s (i3-10100) → dedicated storage, NFS shares
 
 Pi4
 ├── Omada Controller    → AP management (docker)
@@ -32,18 +34,22 @@ Pi4
 ```
 
 ### k3s-node
-Main VM where all services run as containers orchestrated by k3s. k3s replaces Docker Compose with a declarative model — you describe the desired state via YAML manifests and k3s continuously ensures services are running, automatically restarting them on failure.
+Main VM where all services run as containers orchestrated by k3s (8 cores, 16GB RAM). k3s replaces Docker Compose with a declarative model — you describe the desired state via YAML manifests and k3s continuously ensures services are running, automatically restarting them on failure.
 
-Planned services:
+Disks:
+- 50GB — OS + local-path storage class (CNPG databases)
+- 220GB (`media-ssd`, dedicated SSD, LVM-Thin) — Jellyfin media, mounted at `/mnt/media-ssd`
+
+Deployed services:
 - Nextcloud
-- Jellyfin
 - Immich
-- UpSnap
+- Jellyfin
+- cert-manager
+- cnpg-operator
 - Traefik (ingress controller, bundled with k3s)
-- Cert-manager
 
-### storage-server
-VM dedicated to storage. Exports NFS volumes mounted by k3s-node to persist service data. Additional 800GB disk separate from the OS disk. Does not run any application services.
+### NAS (TrueNAS)
+Dedicated hardware (Lenovo V50s, i3-10100) running TrueNAS 25.10. Replaces the old `storage-server` VM. ZFS pools: `data-ssd`, `backup-hdd`. Exports NFS shares consumed by k3s-node for persistent service data. Tailscale configured via TrueNAS Apps UI.
 
 ### lxc-monitoring
 Lightweight LXC container running the observability stack:
@@ -57,10 +63,10 @@ Runs outside k3s intentionally — survives restarts of the main VM.
 Dedicated hardware for network and camera services, managed via Ansible.
 - **Omada Controller** — TP-Link AP management (Docker, mbentley/omada-controller)
 - **MotionEye** — camera monitoring (bare metal via pip)
-- **UpSnap** — Wake-on-LAN (bare metal, NFS-backed data on storage-server)
+- **UpSnap** — Wake-on-LAN (bare metal, NFS-backed data on NAS)
 
 ### VPN
-- **Tailscale** — installed via Ansible on the OS of every homelab machine
+- **Tailscale** — installed via Ansible on the OS of every homelab machine, and via TrueNAS Apps on the NAS
 
 ## Project structure
 
@@ -71,24 +77,22 @@ homelab-infra/
 │   ├── variables.tf              → all variables centralized
 │   ├── outputs.tf                → VM IPs after apply 
 │   ├── vm_k3s-node.tf
-│   ├── vm_storage-server.tf
 │   └── lxc_monitoring.tf
 └── ansible/
     ├── ansible.cfg               → Ansible configuration
     ├── inventory.ini             → hosts and groups
+    ├── requirements.yml          → external collections (community.general, ansible.posix)
     ├── site.yml                  → main entrypoint, imports all playbooks
     ├── group_vars/all/
     │   ├── vars.yml              → shared variables
     │   └── vault.yml             → encrypted secrets (Ansible Vault)
     └── playbooks/
         ├── proxmox.yml           → imports all Proxmox playbooks
-        ├── k3s-node.yml          → k3s + Tailscale + Node Exporter
-        ├── storage-server.yml    → NFS + Tailscale + Node Exporter
+        ├── k3s-node.yml          → k3s + media SSD + Tailscale + Node Exporter
         ├── monitoring.yml        → Prometheus + Grafana + Loki + Tailscale
         ├── pi4.yml               → Omada + MotionEye + Tailscale + Node Exporter
         └── templates/
              ├── omada-compose.yml.j2  → Omada docker-compose
-             ├── exports.j2            → /etc/exports (NFS)
              ├── prometheus.yml.j2     → Prometheus scrape config
              ├── grafana.ini.j2        → Grafana config
              ├── loki-config.j2        → Loki config
@@ -101,6 +105,7 @@ homelab-infra/
 - Proxmox installed on hardware (manual install via ISO)
 - Debian 13 VM template created on Proxmox (`vm_template`)
 - Debian 13 LXC template available on Proxmox (`lxc_template`)
+- TrueNAS installed on dedicated NAS hardware, with NFS shares and Tailscale configured
 - HCP Terraform configured with sensitive variables
 - Raspberry Pi OS (Debian 13) installed on Pi4
 
@@ -118,15 +123,15 @@ After apply, VM IPs are available via outputs:
 
 ```bash
 terraform output ip_k3s_server
-terraform output ip_storage_server
 terraform output ip_monitoring_server
 ```
 
 2. Configure VMs with Ansible
-Update ansible/inventory.ini with the IPs from Terraform outputs, then:
+Update ansible/inventory.ini with the IPs from Terraform outputs, then install required collections:
 
 ```bash
 cd ansible
+ansible-galaxy collection install -r requirements.yml
 
 # run everything
 ansible-playbook site.yml
@@ -150,3 +155,5 @@ ansible-playbook site.yml --ask-vault-pass
 - [x] Ansible for VM OS configuration + Tailscale + Pi services + NFS setup
 - [x] Service deployment via k3s manifests (https://github.com/luisbrancher/homelab-gitops)
 - [x] GitOps with ArgoCD (https://github.com/luisbrancher/homelab-gitops)
+- [x] Dedicated NAS (TrueNAS) replacing storage-server VM
+- [x] Dedicated media SSD for Jellyfin
