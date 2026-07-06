@@ -19,6 +19,37 @@
         name: nfs-common
         state: present
 
+    # media SSD (dedicated Jellyfin storage)
+    - name: Install parted
+      ansible.builtin.apt:
+        name: parted
+        state: present
+
+    - name: Create partition on media SSD
+      community.general.parted:
+        device: /dev/sda
+        number: 1
+        state: present
+        fs_type: ext4
+
+    - name: Format media SSD partition
+      ansible.builtin.filesystem:
+        fstype: ext4
+        dev: /dev/sda1
+
+    - name: Create mount point for media SSD
+      ansible.builtin.file:
+        path: /mnt/media-ssd
+        state: directory
+        mode: '0755'
+
+    - name: Mount media SSD persistently
+      ansible.posix.mount:
+        path: /mnt/media-ssd
+        src: /dev/sda1
+        fstype: ext4
+        state: mounted
+        
   # k3s
     - name: Download and run k3s installation script
       ansible.builtin.shell:
