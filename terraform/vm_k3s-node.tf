@@ -8,18 +8,24 @@ resource "proxmox_virtual_environment_vm" "k3s_node" {
   }
 
   cpu {
-    cores = 4
+    cores = 8
     type  = "host"
   }
 
   memory {
-    dedicated = 8192
+    dedicated = 16384
   }
 
   disk {
     interface    = "scsi0"
     size         = 50
     datastore_id = var.storage_pool
+  }
+
+  disk {
+    interface    = "scsi1"
+    size         = 220
+    datastore_id = "media-ssd"
   }
 
   network_device {

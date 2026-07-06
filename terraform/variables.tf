@@ -64,3 +64,9 @@ variable "storage_pool" {
   type        = string
   default     = "local-lvm"
 }
+
+variable "media_storage_pool" {
+  description = "Storage pool para media do Jellyfin"
+  type        = string
+  default = "media-ssd"  
+}
