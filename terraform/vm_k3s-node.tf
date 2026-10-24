@@ -8,7 +8,7 @@ resource "proxmox_virtual_environment_vm" "k3s_node" {
   }
 
   cpu {
-    cores = 8
+    cores = 16
     type  = "host"
   }
 
