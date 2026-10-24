@@ -230,7 +230,7 @@
 
     - name: Connect to Tailscale with auth key
       ansible.builtin.command:
-        cmd: tailscale up --authkey="{{ tailscale_auth_key }}"
+        cmd: tailscale up --ssh --authkey="{{ tailscale_auth_key }}"  # --ssh: acesso reserva se o sshd travar
       register: tailscale_up
       changed_when: tailscale_up.rc == 0
 
