@@ -100,22 +100,37 @@
         opts: defaults,_netdev
         state: mounted
 
+    # cada versão em /opt/upsnap/<versão>; mudar upsnap_version faz o upgrade
+    - name: Create UpSnap version directory
+      ansible.builtin.file:
+        path: "/opt/upsnap/{{ upsnap_version }}"
+        state: directory
+        mode: '0755'
+
     - name: Download UpSnap binary
       ansible.builtin.get_url:
-        url: "https://github.com/seriousm4x/UpSnap/releases/download/5.3.1/UpSnap_5.3.1_linux_arm64.zip"
-        dest: /tmp/upsnap.zip
+        url: "https://github.com/seriousm4x/UpSnap/releases/download/{{ upsnap_version }}/UpSnap_{{ upsnap_version }}_linux_arm64.zip"
+        dest: "/tmp/upsnap_{{ upsnap_version }}.zip"
 
     - name: Unzip UpSnap binary
       ansible.builtin.unarchive:
-        src: /tmp/upsnap.zip
-        dest: /usr/local/bin/
+        src: "/tmp/upsnap_{{ upsnap_version }}.zip"
+        dest: "/opt/upsnap/{{ upsnap_version }}"
         remote_src: true
-        creates: /usr/local/bin/upsnap
+        creates: "/opt/upsnap/{{ upsnap_version }}/upsnap"
 
     - name: Ensure UpSnap binary is executable
       ansible.builtin.file:
-        path: /usr/local/bin/upsnap
+        path: "/opt/upsnap/{{ upsnap_version }}/upsnap"
         mode: '0755'
+
+    - name: Link active UpSnap version
+      ansible.builtin.file:
+        src: "/opt/upsnap/{{ upsnap_version }}/upsnap"
+        dest: /usr/local/bin/upsnap
+        state: link
+        force: true  # substitui o binário antigo solto em /usr/local/bin
+      notify: Restart UpSnap
 
     - name: Deploy UpSnap systemd service
       ansible.builtin.template:
