@@ -90,12 +90,8 @@
         state: present
 
     # upsnap
-    - name: Create UpSnap NFS mount point
-      ansible.builtin.file:
-        path: /mnt/data/upsnap
-        state: directory
-        mode: '0755'
-
+    # state: mounted já cria o ponto de montagem; um file com mode aqui tenta
+    # dar chmod na raiz do NFS já montado e o root_squash bloqueia
     - name: Mount NFS upsnap share
       ansible.posix.mount:
         path: /mnt/data/upsnap
