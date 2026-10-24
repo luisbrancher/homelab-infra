@@ -21,7 +21,7 @@ N150
 └── OPNsense bare metal → router, firewall, VLANs
 
 Proxmox (i5 1345U)
-├── VM: k3s-node        → 8 cores, 16GB RAM, 50GB + 220GB (media-ssd) disk — main services
+├── VM: k3s-node        → 16 cores, 16GB RAM, 50GB + 220GB (media-ssd) disk — main services
 └── LXC: lxc-monitoring → Prometheus + Grafana + Loki
 
 NAS (TrueNAS)
@@ -34,7 +34,7 @@ Pi4
 ```
 
 ### k3s-node
-Main VM where all services run as containers orchestrated by k3s (8 cores, 16GB RAM). k3s replaces Docker Compose with a declarative model — you describe the desired state via YAML manifests and k3s continuously ensures services are running, automatically restarting them on failure.
+Main VM where all services run as containers orchestrated by k3s (16 cores, 16GB RAM). k3s replaces Docker Compose with a declarative model — you describe the desired state via YAML manifests and k3s continuously ensures services are running, automatically restarting them on failure.
 
 Disks:
 - 50GB — OS + local-path storage class (CNPG databases)
@@ -65,8 +65,11 @@ Dedicated hardware for network and camera services, managed via Ansible.
 - **MotionEye** — camera monitoring (bare metal via pip)
 - **UpSnap** — Wake-on-LAN (bare metal, NFS-backed data on NAS)
 
+Boots from an NVMe SSD in an Argon case (ASMedia ASM2362 USB bridge). UAS is disabled for the bridge (`usb-storage.quirks=174c:2362:u` in `cmdline.txt`) after it dropped the SSD under load. The journal is persistent, so `journalctl -k -b -1` shows why the previous boot died.
+
 ### VPN
 - **Tailscale** — installed via Ansible on the OS of every homelab machine, and via TrueNAS Apps on the NAS
+- **Tailscale SSH** — enabled on the Pi4 as fallback access if `sshd` hangs
 
 ## Project structure
 
@@ -90,7 +93,7 @@ homelab-infra/
         ├── proxmox.yml           → imports all Proxmox playbooks
         ├── k3s-node.yml          → k3s + media SSD + Tailscale + Node Exporter
         ├── monitoring.yml        → Prometheus + Grafana + Loki + Tailscale
-        ├── pi4.yml               → Omada + MotionEye + Tailscale + Node Exporter
+        ├── pi4.yml               → Omada + MotionEye + UpSnap + Tailscale + Node Exporter
         └── templates/
              ├── omada-compose.yml.j2  → Omada docker-compose
              ├── prometheus.yml.j2     → Prometheus scrape config
@@ -147,6 +150,12 @@ Sensitive variables are managed via Ansible Vault:
 ```bash
 ansible-vault edit group_vars/all/vault.yml
 ansible-playbook site.yml --ask-vault-pass
+```
+
+Running from WSL on a Windows drive (`/mnt/...`): Ansible ignores `ansible.cfg` in world-writable directories, so point to it explicitly:
+
+```bash
+export ANSIBLE_CONFIG=$PWD/ansible.cfg
 ```
 
 ## Next steps
