@@ -12,6 +12,16 @@
         cache_valid_time: 3600  # só atualiza se o cache tiver mais de 1h
 
   tasks:
+    # ssd usb (case argon, ponte asmedia asm2362)
+    # o UAS derrubava o SSD com o pi ligado; força o driver usb-storage
+    - name: Disable UAS for the Argon NVMe bridge
+      ansible.builtin.replace:
+        path: /boot/firmware/cmdline.txt
+        regexp: '^(?!.*usb-storage\.quirks=174c:2362:u)(.+)$'
+        replace: 'usb-storage.quirks=174c:2362:u \1'
+        backup: true
+      notify: Reboot pi4
+
     # motioneye
     - name: Install MotionEye dependencies
       ansible.builtin.apt:
@@ -224,4 +234,8 @@
       - name: Restart UpSnap
         ansible.builtin.service:
           name: upsnap
-          state: restarted        
+          state: restarted
+
+      - name: Reboot pi4
+        ansible.builtin.reboot:
+          reboot_timeout: 600
