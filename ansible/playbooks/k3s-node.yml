@@ -24,31 +24,62 @@
       ansible.builtin.apt:
         name: parted
         state: present
+      tags: media
 
     - name: Create partition on media SSD
       community.general.parted:
-        device: /dev/sda
+        device: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1
         number: 1
         state: present
         fs_type: ext4
+      tags: media
 
     - name: Format media SSD partition
       ansible.builtin.filesystem:
         fstype: ext4
-        dev: /dev/sda1
+        dev: /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1-part1
+      tags: media
+
+    - name: Read media SSD UUID
+      ansible.builtin.command:
+        cmd: blkid -s UUID -o value /dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi1-part1
+      register: media_ssd_uuid
+      changed_when: false
+      check_mode: false
+      tags: media
 
     - name: Create mount point for media SSD
       ansible.builtin.file:
         path: /mnt/media-ssd
         state: directory
-        mode: '0755'
+      tags: media
+
+    # bind de / para enxergar a pasta por baixo do mount, sem desmontar o SSD
+    - name: Make the empty mount point immutable (writes fail if the SSD is not mounted)
+      ansible.builtin.shell:
+        cmd: |
+          set -e
+          tmp=$(mktemp -d)
+          mount --bind / "$tmp"
+          trap 'umount "$tmp"; rmdir "$tmp"' EXIT
+          if lsattr -d "$tmp/mnt/media-ssd" | cut -d' ' -f1 | grep -q i; then
+            echo unchanged
+          else
+            chattr +i "$tmp/mnt/media-ssd"
+            echo changed
+          fi
+        executable: /bin/bash
+      register: media_ssd_immutable
+      changed_when: media_ssd_immutable.stdout == 'changed'
+      tags: media
 
     - name: Mount media SSD persistently
       ansible.posix.mount:
         path: /mnt/media-ssd
-        src: /dev/sda1
+        src: "UUID={{ media_ssd_uuid.stdout }}"
         fstype: ext4
         state: mounted
+      tags: media
         
   # k3s
     - name: Download and run k3s installation script
