@@ -20,12 +20,16 @@ resource "proxmox_virtual_environment_vm" "k3s_node" {
     interface    = "scsi0"
     size         = 50
     datastore_id = var.storage_pool
+    discard      = "on"
+    ssd          = true
   }
 
   disk {
     interface    = "scsi1"
     size         = 220
     datastore_id = "media-ssd"
+    discard      = "on"
+    ssd          = true
   }
 
   network_device {

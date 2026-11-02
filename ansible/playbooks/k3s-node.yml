@@ -80,6 +80,13 @@
         fstype: ext4
         state: mounted
       tags: media
+
+    - name: Ensure fstrim timer is enabled
+      ansible.builtin.service:
+        name: fstrim.timer
+        state: started
+        enabled: true
+      tags: media
         
   # k3s
     - name: Download and run k3s installation script
