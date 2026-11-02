@@ -18,7 +18,7 @@ resource "proxmox_virtual_environment_vm" "k3s_node" {
 
   disk {
     interface    = "scsi0"
-    size         = 50
+    size         = 100
     datastore_id = var.storage_pool
     discard      = "on"
     ssd          = true
