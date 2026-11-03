@@ -20,8 +20,8 @@ ArgoCD      → GitOps, applies changes to k3s via git push
 N150
 └── OPNsense bare metal → router, firewall, VLANs
 
-Proxmox (i5 1345U)
-├── VM: k3s-node        → 16 cores, 16GB RAM, 50GB + 220GB (media-ssd) disk — main services
+Proxmox (Lenovo M80q, i5-13500T, 32GB RAM)
+├── VM: k3s-node        → 16 cores, 16GB RAM, 100GB + 220GB (media-ssd) disk — main services
 └── LXC: lxc-monitoring → Prometheus + Grafana + Loki
 
 NAS (TrueNAS)
