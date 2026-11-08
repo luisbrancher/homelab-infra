@@ -236,6 +236,133 @@
       when: tailscale_status.rc != 0
       no_log: true
 
+    # forgejo-runner (Actions): executor "host", sem Docker. Os jobs rodam como o usuario
+    # runner (sem sudo) direto na LXC. Registro offline: o segredo e gerado aqui e nunca
+    # vai para o repo (este repo e publico).
+    - name: Install runner dependencies (jobs rodam direto no host)
+      ansible.builtin.apt:
+        name:
+          - nodejs          # actions/checkout e outras actions em JS
+          - rsync
+          - openssh-client
+          - openssl
+          - python3
+          - python3-venv    # builds das wikis
+        state: present
+
+    - name: Create runner user
+      ansible.builtin.user:
+        name: runner
+        system: true
+        shell: /bin/bash
+        home: /var/lib/forgejo-runner
+        create_home: true
+
+    - name: Download forgejo-runner binary
+      ansible.builtin.get_url:
+        url: "https://code.forgejo.org/forgejo/runner/releases/download/v{{ forgejo_runner_version }}/forgejo-runner-{{ forgejo_runner_version }}-linux-amd64"
+        dest: /usr/local/bin/forgejo-runner
+        checksum: "sha256:https://code.forgejo.org/forgejo/runner/releases/download/v{{ forgejo_runner_version }}/forgejo-runner-{{ forgejo_runner_version }}-linux-amd64.sha256"
+        mode: '0755'
+      notify: Restart forgejo-runner
+
+    - name: Create runner config directory
+      ansible.builtin.file:
+        path: /etc/forgejo-runner
+        state: directory
+        owner: root
+        group: runner
+        mode: '0750'
+
+    - name: Generate runner secret (once; 40 hex)
+      ansible.builtin.shell:
+        cmd: umask 077 && openssl rand -hex 20 > /etc/forgejo-runner/secret
+        creates: /etc/forgejo-runner/secret
+
+    - name: Register runner in Forgejo (offline, once; instance-wide)
+      ansible.builtin.shell:
+        cmd: >-
+          set -e;
+          uuid=$(runuser -u git -- /usr/local/bin/forgejo --config /etc/forgejo/app.ini --work-path /var/lib/forgejo
+          forgejo-cli actions register --name forgejo-host --secret "$(cat /etc/forgejo-runner/secret)");
+          test -n "$uuid";
+          echo "$uuid" > /etc/forgejo-runner/uuid
+        creates: /etc/forgejo-runner/uuid
+      no_log: true
+
+    - name: Read runner credentials
+      ansible.builtin.slurp:
+        src: "/etc/forgejo-runner/{{ item }}"
+      loop: [uuid, secret]
+      register: runner_creds
+      no_log: true
+
+    - name: Copy runner config
+      ansible.builtin.template:
+        src: templates/forgejo-runner-config.yml.j2
+        dest: /etc/forgejo-runner/config.yml
+        owner: root
+        group: runner
+        mode: '0640'
+      vars:
+        runner_uuid: "{{ runner_creds.results[0].content | b64decode | trim }}"
+        runner_token: "{{ runner_creds.results[1].content | b64decode | trim }}"
+      no_log: true
+      notify: Restart forgejo-runner
+
+    - name: Create runner .ssh
+      ansible.builtin.file:
+        path: /var/lib/forgejo-runner/.ssh
+        state: directory
+        owner: runner
+        group: runner
+        mode: '0700'
+
+    # host keys das LXCs de site, gravadas uma vez (LAN). Se uma LXC for recriada, apagar
+    # este arquivo e rodar o playbook de novo.
+    - name: Record host keys of the deploy targets
+      ansible.builtin.shell:
+        cmd: "ssh-keyscan -t ed25519 {{ forgejo_runner_deploy_hosts | join(' ') }} > /var/lib/forgejo-runner/.ssh/known_hosts"
+        creates: /var/lib/forgejo-runner/.ssh/known_hosts
+
+    - name: Set owner of runner known_hosts
+      ansible.builtin.file:
+        path: /var/lib/forgejo-runner/.ssh/known_hosts
+        owner: runner
+        group: runner
+        mode: '0644'
+
+    - name: Create forgejo-runner service on systemd
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/forgejo-runner.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Forgejo Runner (executor host)
+          After=network-online.target forgejo.service
+          Wants=network-online.target
+
+          [Service]
+          User=runner
+          Group=runner
+          WorkingDirectory=/var/lib/forgejo-runner
+          ExecStart=/usr/local/bin/forgejo-runner daemon --config /etc/forgejo-runner/config.yml
+          Restart=always
+          RestartSec=5s
+
+          [Install]
+          WantedBy=multi-user.target
+      notify:
+        - Reload systemd
+        - Restart forgejo-runner
+
+    - name: Ensure forgejo-runner is running and enabled on boot
+      ansible.builtin.systemd:
+        name: forgejo-runner
+        state: started
+        enabled: true
+        daemon_reload: true
+
   handlers:
     - name: Reload systemd
       ansible.builtin.systemd:
@@ -249,4 +376,9 @@
     - name: Restart Caddy
       ansible.builtin.service:
         name: caddy
+        state: restarted
+
+    - name: Restart forgejo-runner
+      ansible.builtin.service:
+        name: forgejo-runner
         state: restarted

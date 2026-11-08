@@ -31,3 +31,7 @@ forgejo_domain: "git.lflab.cc"
 forgejo_http_port: 3000
 forgejo_ssh_port: 2222
 forgejo_dump_keep: 14
+# forgejo-runner (Actions), executor host na propria LXC; releases em code.forgejo.org/forgejo/runner
+forgejo_runner_version: "13.2.1"
+# LXCs de site que recebem rsync dos workflows (dash-infra): host keys gravadas no known_hosts do runner
+forgejo_runner_deploy_hosts: ["10.10.10.90", "10.10.10.92"]
