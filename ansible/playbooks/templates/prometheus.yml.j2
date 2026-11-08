@@ -28,6 +28,11 @@ scrape_configs:
     static_configs:
       - targets: ["{{ hostvars['pi4']['ansible_host'] }}:9100"]
 
+  # métricas do forgejo
+  - job_name: "forgejo"
+    static_configs:
+      - targets: ["{{ hostvars['forgejo']['ansible_host'] }}:9100"]
+
   # truenas - SNMP exporter a configurar futuramente
   # - job_name: "truenas"
   #   static_configs:

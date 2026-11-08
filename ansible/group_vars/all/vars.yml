@@ -23,3 +23,11 @@ upsnap_version: "5.3.1"
 upsnap_port: 8090
 
 motioneye_port: 8765
+
+# forgejo
+forgejo_ip: "{{ hostvars['forgejo']['ansible_host'] }}"
+forgejo_version: "15.0.11"
+forgejo_domain: "git.lflab.cc"
+forgejo_http_port: 3000
+forgejo_ssh_port: 2222
+forgejo_dump_keep: 14

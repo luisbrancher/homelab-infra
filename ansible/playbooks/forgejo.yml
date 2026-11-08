@@ -1,0 +1,252 @@
+---
+
+- name: Configure forgejo
+  hosts: forgejo
+  become: true
+
+  pre_tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+  tasks:
+    - name: Install dependencies
+      ansible.builtin.apt:
+        name:
+          - git
+          - curl
+          - ca-certificates
+          - caddy
+        state: present
+
+    # usuário e pastas
+    - name: Create git user
+      ansible.builtin.user:
+        name: git
+        system: true
+        shell: /bin/bash
+        home: /var/lib/forgejo
+        create_home: false
+
+    - name: Create Forgejo data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: git
+        group: git
+        mode: '0750'
+      loop:
+        - /var/lib/forgejo
+        - /var/lib/forgejo/custom
+        - /var/lib/forgejo/data
+        - /var/lib/forgejo/log
+
+    - name: Create Forgejo config directory
+      ansible.builtin.file:
+        path: /etc/forgejo
+        state: directory
+        owner: root
+        group: git
+        mode: '0750'
+
+    # binário (com checagem do sha256 publicado junto da release)
+    - name: Download Forgejo binary
+      ansible.builtin.get_url:
+        url: "https://codeberg.org/forgejo/forgejo/releases/download/v{{ forgejo_version }}/forgejo-{{ forgejo_version }}-linux-amd64"
+        dest: /usr/local/bin/forgejo
+        checksum: "sha256:https://codeberg.org/forgejo/forgejo/releases/download/v{{ forgejo_version }}/forgejo-{{ forgejo_version }}-linux-amd64.sha256"
+        mode: '0755'
+      notify: Restart Forgejo
+
+    # segredos: gerados uma vez na LXC, nunca no repo
+    - name: Generate Forgejo secrets
+      ansible.builtin.shell:
+        cmd: "umask 077 && /usr/local/bin/forgejo generate secret {{ item.kind }} > /etc/forgejo/{{ item.file }}"
+        creates: "/etc/forgejo/{{ item.file }}"
+      loop:
+        - { kind: SECRET_KEY, file: secret_key }
+        - { kind: INTERNAL_TOKEN, file: internal_token }
+        - { kind: JWT_SECRET, file: jwt_secret }
+
+    - name: Set permissions on Forgejo secrets
+      ansible.builtin.file:
+        path: "/etc/forgejo/{{ item }}"
+        owner: root
+        group: git
+        mode: '0640'
+      loop:
+        - secret_key
+        - internal_token
+        - jwt_secret
+
+    - name: Copy Forgejo config
+      ansible.builtin.template:
+        src: templates/forgejo-app.ini.j2
+        dest: /etc/forgejo/app.ini
+        owner: root
+        group: git
+        mode: '0640'
+      notify: Restart Forgejo
+
+    - name: Create Forgejo service on systemd
+      ansible.builtin.template:
+        src: templates/forgejo.service.j2
+        dest: /etc/systemd/system/forgejo.service
+        mode: '0644'
+      notify:
+        - Reload systemd
+        - Restart Forgejo
+
+    - name: Ensure Forgejo is running and enabled on boot
+      ansible.builtin.systemd:
+        name: forgejo
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    # caddy (HTTPS com certificado DNS-01 da Cloudflare, igual aos dashboards)
+    - name: Check if Caddy already has the Cloudflare DNS plugin
+      ansible.builtin.command:
+        cmd: /usr/bin/caddy list-modules
+      register: caddy_modules
+      changed_when: false
+
+    - name: Download Caddy build with the Cloudflare DNS plugin
+      ansible.builtin.get_url:
+        url: "https://caddyserver.com/api/download?os=linux&arch=amd64&p=github.com%2Fcaddy-dns%2Fcloudflare"
+        dest: /tmp/caddy-custom
+        mode: '0755'
+      when: "'dns.providers.cloudflare' not in caddy_modules.stdout"
+
+    - name: Install Caddy build with the Cloudflare DNS plugin
+      ansible.builtin.copy:
+        src: /tmp/caddy-custom
+        dest: /usr/bin/caddy
+        remote_src: true
+        mode: '0755'
+      when: "'dns.providers.cloudflare' not in caddy_modules.stdout"
+      notify: Restart Caddy
+
+    - name: Hold caddy package so apt upgrade keeps the custom binary
+      ansible.builtin.dpkg_selections:
+        name: caddy
+        selection: hold
+
+    - name: Copy Caddy environment file (Cloudflare token)
+      ansible.builtin.copy:
+        content: "CF_API_TOKEN={{ caddy_cf_api_token }}\n"
+        dest: /etc/caddy/caddy.env
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+      notify: Restart Caddy
+
+    - name: Create Caddy drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/caddy.service.d
+        state: directory
+        mode: '0755'
+
+    - name: Create Caddy systemd drop-in
+      ansible.builtin.copy:
+        content: |
+          [Service]
+          EnvironmentFile=/etc/caddy/caddy.env
+          ExecStart=
+          ExecStart=/usr/bin/caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+        dest: /etc/systemd/system/caddy.service.d/cloudflare.conf
+        mode: '0644'
+      notify:
+        - Reload systemd
+        - Restart Caddy
+
+    - name: Copy Caddyfile
+      ansible.builtin.template:
+        src: templates/forgejo-caddyfile.j2
+        dest: /etc/caddy/Caddyfile
+        mode: '0644'
+      notify: Restart Caddy
+
+    - name: Ensure Caddy is running and enabled on boot
+      ansible.builtin.systemd:
+        name: caddy
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    # aplica os restarts pendentes agora, para uma falha mais abaixo (ex.: Tailscale)
+    # não deixar o Caddy rodando com a config antiga
+    - name: Flush pending handlers
+      ansible.builtin.meta: flush_handlers
+
+    # dump diário para o NFS (bind mount do host em /mnt/db-dumps)
+    - name: Copy Forgejo dump script
+      ansible.builtin.template:
+        src: templates/forgejo-dump.sh.j2
+        dest: /usr/local/bin/forgejo-dump.sh
+        owner: root
+        group: root
+        mode: '0750'
+
+    - name: Schedule daily Forgejo dump
+      ansible.builtin.cron:
+        name: forgejo-dump
+        user: root
+        # 02:00 UTC = 23:00 em Brasília, antes do snapshot do TrueNAS (00:00 BRT)
+        minute: "0"
+        hour: "2"
+        job: /usr/local/bin/forgejo-dump.sh
+
+    # node exporter
+    - name: Install Node Exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: present
+
+    - name: Ensure Node Exporter is running and enabled on boot
+      ansible.builtin.service:
+        name: prometheus-node-exporter
+        state: started
+        enabled: true
+
+    # tailscale
+    - name: Download and run Tailscale installation script
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://tailscale.com/install.sh | sh
+        creates: /usr/bin/tailscale
+
+    - name: Ensure Tailscale is running and enabled on boot
+      ansible.builtin.service:
+        name: tailscaled
+        state: started
+        enabled: true
+
+    - name: Check if already connected to the tailnet
+      ansible.builtin.command:
+        cmd: tailscale status
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+
+    - name: Connect to Tailscale with auth key
+      ansible.builtin.command:
+        cmd: tailscale up --authkey="{{ tailscale_auth_key }}" --hostname=forgejo
+      when: tailscale_status.rc != 0
+      no_log: true
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart Forgejo
+      ansible.builtin.service:
+        name: forgejo
+        state: restarted
+
+    - name: Restart Caddy
+      ansible.builtin.service:
+        name: caddy
+        state: restarted
