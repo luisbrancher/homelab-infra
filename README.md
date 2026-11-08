@@ -22,7 +22,8 @@ N150
 
 Proxmox (Lenovo M80q, i5-13500T, 32GB RAM)
 ├── VM: k3s-node        → 16 cores, 16GB RAM, 100GB + 220GB (media-ssd) disk — main services
-└── LXC: lxc-monitoring → Prometheus + Grafana + Loki
+├── LXC: lxc-monitoring → Prometheus + Grafana + Loki
+└── LXC: forgejo        → private Git server (Forgejo) + Actions runner
 
 NAS (TrueNAS)
 └── Lenovo V50s (i3-10100) → dedicated storage, NFS shares
@@ -59,6 +60,12 @@ Lightweight LXC container running the observability stack:
 
 Runs outside k3s intentionally — survives restarts of the main VM.
 
+### forgejo
+LXC (id 121, static IP) running a private [Forgejo](https://forgejo.org) instance for personal repos that should not live on GitHub. Installed from the official binary, SQLite database, HTTPS through Caddy (Cloudflare DNS-01), reachable only over Tailscale. Registration is disabled; accounts are created by the admin.
+- **Secrets** (`secret_key`, `internal_token`, `jwt_secret`) are generated on the container at first run; the Cloudflare token and Tailscale key come from the Ansible Vault (`caddy_cf_api_token`, `tailscale_auth_key`)
+- **Backup** — a daily cron runs `forgejo dump` into an NFS dataset on the NAS (bind mount in the LXC at `/mnt/db-dumps`)
+- Two steps stay manual on the Proxmox host, like in `lxc-monitoring`: the TUN device and the bind mount (see the comment in `lxc_forgejo.tf`)
+
 ### Pi4
 Dedicated hardware for network and camera services, managed via Ansible.
 - **Omada Controller** — TP-Link AP management (Docker, mbentley/omada-controller)
@@ -80,7 +87,8 @@ homelab-infra/
 │   ├── variables.tf              → all variables centralized
 │   ├── outputs.tf                → VM IPs after apply 
 │   ├── vm_k3s-node.tf
-│   └── lxc_monitoring.tf
+│   ├── lxc_monitoring.tf
+│   └── lxc_forgejo.tf
 └── ansible/
     ├── ansible.cfg               → Ansible configuration
     ├── inventory.ini             → hosts and groups
@@ -93,6 +101,7 @@ homelab-infra/
         ├── proxmox.yml           → imports all Proxmox playbooks
         ├── k3s-node.yml          → k3s + media SSD + Tailscale + Node Exporter
         ├── monitoring.yml        → Prometheus + Grafana + Loki + Tailscale
+        ├── forgejo.yml           → Forgejo + Caddy (HTTPS) + daily dump + Node Exporter + Tailscale
         ├── pi4.yml               → Omada + MotionEye + UpSnap + Tailscale + Node Exporter
         └── templates/
              ├── omada-compose.yml.j2  → Omada docker-compose
@@ -127,6 +136,7 @@ After apply, VM IPs are available via outputs:
 ```bash
 terraform output ip_k3s_server
 terraform output ip_monitoring_server
+terraform output ip_forgejo_server
 ```
 
 2. Configure VMs with Ansible
@@ -143,6 +153,7 @@ ansible-playbook site.yml
 ansible-playbook playbooks/proxmox.yml
 ansible-playbook playbooks/pi4.yml
 ansible-playbook playbooks/monitoring.yml
+ansible-playbook playbooks/forgejo.yml
 ```
 
 Sensitive variables are managed via Ansible Vault:
