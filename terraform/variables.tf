@@ -34,6 +34,24 @@ variable "k3s_server" {
   default     = "k3s-node"
 }
 
+variable "forgejo_server" {
+  description = "Hostname da LXC do Forgejo"
+  type        = string
+  default     = "forgejo"
+}
+
+variable "forgejo_ip" {
+  description = "IP fixo (CIDR) da LXC do Forgejo"
+  type        = string
+  default     = "10.10.10.85/24"
+}
+
+variable "network_gateway" {
+  description = "Gateway da LAN (OPNsense)"
+  type        = string
+  default     = "10.10.10.1"
+}
+
 # infra variables
 variable "proxmox_node" {
   description = "Nome do node Proxmox"
