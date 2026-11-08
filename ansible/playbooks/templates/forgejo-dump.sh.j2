@@ -1,0 +1,24 @@
+#!/bin/sh
+# Gerado pelo Ansible. Dump diário do Forgejo para o NFS do TrueNAS (data-ssd/db-dumps/forgejo),
+# que já entra no snapshot, na réplica e no Cloud Sync cifrado para o Drive.
+set -eu
+
+DEST=/mnt/db-dumps
+TMP=/var/lib/forgejo/dump.zip
+KEEP={{ forgejo_dump_keep }}
+
+# Sem o bind mount, o dump cairia no disco local da LXC e ninguém perceberia
+mountpoint -q "$DEST" || { echo "bind mount $DEST ausente" >&2; exit 1; }
+
+rm -f "$TMP"
+# O forgejo não roda como root: o dump sai como usuário git e depois é copiado
+runuser -u git -- /usr/local/bin/forgejo dump \
+  --config /etc/forgejo/app.ini --work-path /var/lib/forgejo \
+  --file "$TMP" --type zip
+
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+install -m 0640 "$TMP" "$DEST/forgejo-$STAMP.zip"
+rm -f "$TMP"
+
+# mantém só os $KEEP mais novos
+ls -1t "$DEST"/forgejo-*.zip | tail -n +$((KEEP + 1)) | xargs -r rm -f --

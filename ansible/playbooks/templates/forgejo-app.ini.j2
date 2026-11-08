@@ -1,0 +1,48 @@
+; Gerado pelo Ansible (playbooks/forgejo.yml). Não editar na LXC.
+APP_NAME = Forgejo
+RUN_USER = git
+WORK_PATH = /var/lib/forgejo
+
+[server]
+DOMAIN = {{ forgejo_domain }}
+ROOT_URL = https://{{ forgejo_domain }}/
+; O Caddy faz o HTTPS e fala com o Forgejo só em localhost
+HTTP_ADDR = 127.0.0.1
+HTTP_PORT = {{ forgejo_http_port }}
+; SSH embutido do Forgejo, em porta própria (o sshd da LXC fica na 22)
+DISABLE_SSH = false
+START_SSH_SERVER = true
+SSH_DOMAIN = {{ forgejo_domain }}
+SSH_PORT = {{ forgejo_ssh_port }}
+SSH_LISTEN_PORT = {{ forgejo_ssh_port }}
+LFS_START_SERVER = false
+
+[database]
+DB_TYPE = sqlite3
+PATH = /var/lib/forgejo/data/forgejo.db
+
+[repository]
+ROOT = /var/lib/forgejo/data/forgejo-repositories
+
+[security]
+INSTALL_LOCK = true
+; Segredos gerados na própria LXC pelo playbook; nunca ficam no repo
+SECRET_KEY_URI = file:/etc/forgejo/secret_key
+INTERNAL_TOKEN_URI = file:/etc/forgejo/internal_token
+
+[oauth2]
+JWT_SECRET_URI = file:/etc/forgejo/jwt_secret
+
+[service]
+DISABLE_REGISTRATION = true
+REQUIRE_SIGNIN_VIEW = true
+
+[session]
+COOKIE_SECURE = true
+
+[actions]
+ENABLED = true
+
+[log]
+MODE = console
+LEVEL = info
