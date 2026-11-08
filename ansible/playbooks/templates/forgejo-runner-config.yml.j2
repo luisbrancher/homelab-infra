@@ -1,0 +1,22 @@
+# Gerado pelo Ansible (playbooks/forgejo.yml). Não editar na LXC.
+# Referência de todas as opções: forgejo-runner generate-config
+log:
+  level: info
+
+runner:
+  # um job por vez: a LXC tem 2 vCPU e 1 GB
+  capacity: 1
+  timeout: 1h
+  # runs-on: host -> roda direto na LXC, como o usuário runner (sem container)
+  labels:
+    - "host:host"
+
+host:
+  workdir_parent: /var/lib/forgejo-runner/work
+
+server:
+  connections:
+    forgejo:
+      url: https://{{ forgejo_domain }}/
+      uuid: {{ runner_uuid }}
+      token: {{ runner_token }}
