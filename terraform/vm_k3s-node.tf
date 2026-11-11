@@ -35,6 +35,9 @@ resource "proxmox_virtual_environment_vm" "k3s_node" {
   network_device {
     bridge = var.network_bridge
     model  = "virtio"
+    # MAC fixo: o IP 10.10.10.11 vem da reserva DHCP no OPNsense (homelab-network, setup_opnsense.yml).
+    # Sem ele, recriar a VM gera MAC novo, IP novo, e quebra inventário, PVs e DNS.
+    mac_address = "BC:24:11:5A:36:6A"
   }
 
   initialization {

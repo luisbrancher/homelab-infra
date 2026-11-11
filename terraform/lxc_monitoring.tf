@@ -34,6 +34,8 @@ resource "proxmox_virtual_environment_container" "monitoring" {
   network_interface {
     name   = "eth0"
     bridge = var.network_bridge
+    # MAC fixo: o IP 10.10.10.13 vem da reserva DHCP no OPNsense (homelab-network, setup_opnsense.yml)
+    mac_address = "BC:24:11:D1:3C:97"
   }
 
   operating_system {
