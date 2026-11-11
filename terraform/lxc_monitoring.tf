@@ -23,7 +23,9 @@ resource "proxmox_virtual_environment_container" "monitoring" {
   }
 
   memory {
-    dedicated = 1024
+    # 1 GB ficava no limite com um dashboard aberto; folga para Alertmanager, Alloy e blackbox (Fase 2).
+    # Numa LXC é teto, não reserva: o host só entrega o que os processos usam.
+    dedicated = 4096
   }
 
   disk {

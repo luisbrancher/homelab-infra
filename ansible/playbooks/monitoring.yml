@@ -68,6 +68,13 @@
         group: prometheus
       notify: Restart Prometheus
 
+    - name: Set Prometheus retention flags
+      ansible.builtin.lineinfile:
+        path: /etc/default/prometheus
+        regexp: '^ARGS='
+        line: 'ARGS="--storage.tsdb.retention.time={{ prometheus_retention_time }} --storage.tsdb.retention.size={{ prometheus_retention_size }}"'
+      notify: Restart Prometheus
+
     # loki
     - name: Create Loki user
       ansible.builtin.user:
@@ -78,14 +85,16 @@
     - name: Download Loki binary
       ansible.builtin.get_url:
         url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
-        dest: /tmp/loki.zip
+        # versão no nome: com um nome fixo, o get_url não baixa de novo quando o loki_version muda
+        dest: "/tmp/loki-{{ loki_version }}.zip"
 
     - name: Unzip Loki binary
       ansible.builtin.unarchive:
-        src: /tmp/loki.zip
+        src: "/tmp/loki-{{ loki_version }}.zip"
         dest: /usr/local/bin/
         remote_src: true
         mode: '0755'
+      notify: Restart Loki
 
     - name: Create Loki symlink
       ansible.builtin.file:
@@ -105,6 +114,7 @@
         - /var/loki/cache
         - /var/loki/chunks
         - /var/loki/wal
+        - /var/loki/compactor
 
     - name: Copy Loki config
       ansible.builtin.template:

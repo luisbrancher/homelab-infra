@@ -11,8 +11,15 @@ nfs_server: "{{ hostvars['truenas']['ansible_host'] }}"
 grafana_port: 3000
 grafana_admin_user: admin
 
-loki_version: "3.7.2"
+loki_version: "3.7.9"
 loki_port: 3100
+# Logs mais velhos que isso são apagados pelo compactor
+loki_retention_period: 336h # 14 dias
+
+# Prometheus (pacote do Debian): o que vencer primeiro, tempo ou tamanho.
+# Em 2026-11-11 eram 893 MB com 15 dias; o tamanho segura o disco de 20 GB quando entrarem mais alvos.
+prometheus_retention_time: 30d
+prometheus_retention_size: 8GB
 
 # pi4
 pi4_ip: "{{ hostvars['pi4']['ansible_host'] }}"
