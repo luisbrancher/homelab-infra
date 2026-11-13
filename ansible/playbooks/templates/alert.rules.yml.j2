@@ -1,0 +1,80 @@
+# Gerenciado pelo Ansible — não editar manualmente
+{#
+  Comentário do Jinja (não vai para o arquivo final). Chaves duplas dentro dos blocos raw
+  são templates do Prometheus, preenchidos na hora do alerta; as de fora são variáveis do
+  Ansible (limiares em vars.yml). Comentário com chaves fora deste bloco quebra o template.
+#}
+
+groups:
+  - name: hosts
+    rules:
+
+      - alert: InstanceDown
+        expr: up == 0
+        for: {{ alert_instance_down_for }}
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}{{ $labels.job }} ({{ $labels.instance }}) fora do ar{% endraw %}"
+          description: "O Prometheus não consegue coletar este alvo há mais de {{ alert_instance_down_for }}."
+
+      # Mesmo nome nos dois níveis: a inhibit_rule do Alertmanager segura o warning quando o critical dispara.
+      # NFS fica de fora: o TrueNAS e o Scrutiny já avisam do NAS.
+      - alert: DiskSpaceLow
+        expr: >
+          (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|nfs.*|fuse.*"}
+             / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|nfs.*|fuse.*"}) * 100
+          > {{ alert_disk_warning_pct }}
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{% raw %}Disco {{ $labels.mountpoint }} em {{ $value | printf \"%.0f\" }}% ({{ $labels.job }}){% endraw %}"
+          description: "Uso acima de {{ alert_disk_warning_pct }}% há mais de 10 min."
+
+      - alert: DiskSpaceLow
+        expr: >
+          (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|nfs.*|fuse.*"}
+             / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|nfs.*|fuse.*"}) * 100
+          > {{ alert_disk_critical_pct }}
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}Disco {{ $labels.mountpoint }} em {{ $value | printf \"%.0f\" }}% ({{ $labels.job }}){% endraw %}"
+          description: "Uso acima de {{ alert_disk_critical_pct }}% há mais de 5 min."
+
+      # Tendência das últimas 6h projetada para 24h. Só a partir de 50% de uso, senão um download grande num disco vazio já dispara.
+      - alert: DiskWillFillIn24h
+        expr: >
+          predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|nfs.*|fuse.*"}[6h], 24 * 3600) < 0
+          and
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|nfs.*|fuse.*"}
+            / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|nfs.*|fuse.*"} < 0.5
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "{% raw %}Disco {{ $labels.mountpoint }} vai encher em menos de 24h ({{ $labels.job }}){% endraw %}"
+          description: "Projeção linear do espaço livre nas últimas 6h."
+
+      - alert: MemoryHigh
+        expr: >
+          (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100
+          > {{ alert_memory_pct }}
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{% raw %}Memória em {{ $value | printf \"%.0f\" }}% ({{ $labels.job }}){% endraw %}"
+          description: "Uso de RAM acima de {{ alert_memory_pct }}% há mais de 10 min."
+
+  - name: meta
+    rules:
+      # Sempre ativo. Se parar de chegar no dead man's switch (fase 3), o Prometheus ou o Alertmanager caiu.
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: none
+        annotations:
+          summary: "Pipeline de alertas funcionando"

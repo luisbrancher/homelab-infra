@@ -21,6 +21,14 @@ loki_retention_period: 336h # 14 dias
 prometheus_retention_time: 30d
 prometheus_retention_size: 8GB
 
+# Alertmanager (pacote prometheus-alertmanager do Debian), mesma LXC do Prometheus.
+alertmanager_port: 9093
+# Limiares das regras em alert.rules.yml.j2
+alert_instance_down_for: 2m
+alert_disk_warning_pct: 80
+alert_disk_critical_pct: 90
+alert_memory_pct: 90
+
 # pi4
 pi4_ip: "{{ hostvars['pi4']['ansible_host'] }}"
 

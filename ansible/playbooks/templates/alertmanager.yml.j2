@@ -1,0 +1,28 @@
+# Gerenciado pelo Ansible — não editar manualmente
+# Contém o token do bot (vault): o arquivo é instalado com modo 0640.
+
+route:
+  receiver: telegram
+  # alertas com os mesmos labels viram uma mensagem só
+  group_by: ['alertname', 'instance']
+  group_wait: 30s        # espera antes de mandar o primeiro de um grupo novo
+  group_interval: 5m     # espera antes de mandar novidades de um grupo que já avisou
+  repeat_interval: 12h   # reenvia se o alerta continuar disparando
+  routes:
+    # Watchdog dispara sempre; vai para o dead man's switch na fase 3. Até lá, descartado.
+    - matchers: ['alertname = Watchdog']
+      receiver: blackhole
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token: '{{ telegram_bot_token }}'
+        chat_id: {{ telegram_chat_id }}
+        send_resolved: true
+  - name: blackhole
+
+inhibit_rules:
+  # se o critical está disparando, segura o warning do mesmo alerta no mesmo host
+  - source_matchers: ['severity = critical']
+    target_matchers: ['severity = warning']
+    equal: ['alertname', 'instance', 'mountpoint']

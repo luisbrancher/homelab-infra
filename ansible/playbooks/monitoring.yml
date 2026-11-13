@@ -60,12 +60,24 @@
         name: prometheus
         state: present
 
+    # antes do prometheus.yml: o promtool check config abre os rule_files que ele referencia
+    - name: Copy Prometheus alert rules
+      ansible.builtin.template:
+        src: templates/alert.rules.yml.j2
+        dest: /etc/prometheus/alert.rules.yml
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+        validate: promtool check rules %s
+      notify: Restart Prometheus
+
     - name: Copy Prometheus config
       ansible.builtin.template:
         src: templates/prometheus.yml.j2
         dest: /etc/prometheus/prometheus.yml
         owner: prometheus
         group: prometheus
+        validate: promtool check config %s
       notify: Restart Prometheus
 
     - name: Set Prometheus retention flags
@@ -74,6 +86,31 @@
         regexp: '^ARGS='
         line: 'ARGS="--storage.tsdb.retention.time={{ prometheus_retention_time }} --storage.tsdb.retention.size={{ prometheus_retention_size }}"'
       notify: Restart Prometheus
+
+    # alertmanager
+    - name: Install Alertmanager
+      ansible.builtin.apt:
+        name: prometheus-alertmanager # traz o amtool junto
+        state: present
+
+    - name: Copy Alertmanager config
+      ansible.builtin.template:
+        src: templates/alertmanager.yml.j2
+        dest: /etc/prometheus/alertmanager.yml
+        owner: prometheus
+        group: prometheus
+        mode: '0640' # tem o token do bot do Telegram
+        validate: amtool check-config %s
+      no_log: true # não mostrar o token no diff/saída do Ansible
+      notify: Restart Alertmanager
+
+    # nó único: desliga o gossip de cluster (porta 9094), que não tem uso aqui
+    - name: Set Alertmanager flags
+      ansible.builtin.lineinfile:
+        path: /etc/default/prometheus-alertmanager
+        regexp: '^ARGS='
+        line: 'ARGS="--cluster.listen-address="'
+      notify: Restart Alertmanager
 
     # loki
     - name: Create Loki user
@@ -138,7 +175,8 @@
       loop:
       - grafana-server
       - prometheus
-      - loki 
+      - prometheus-alertmanager
+      - loki
 
   # node exporter
     - name: Install Node Exporter
@@ -186,6 +224,11 @@
     - name: Restart Prometheus
       ansible.builtin.service:
         name: prometheus
+        state: restarted
+
+    - name: Restart Alertmanager
+      ansible.builtin.service:
+        name: prometheus-alertmanager
         state: restarted
 
     - name: Restart Grafana
