@@ -6,12 +6,27 @@ global:
   # intervalo de avaliação de alertas
   evaluation_interval: 15s
 
+# para onde mandar os alertas que estão firing (Alertmanager na mesma LXC)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["localhost:{{ alertmanager_port }}"]
+
+# regras avaliadas a cada evaluation_interval (template alert.rules.yml.j2)
+rule_files:
+  - /etc/prometheus/alert.rules.yml
+
 scrape_configs:
 
   # o próprio Prometheus se monitora
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]
+
+  # o Alertmanager também expõe métricas (alertas recebidos, notificações que falharam)
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["localhost:{{ alertmanager_port }}"]
 
   # métricas do k3s-node
   - job_name: "k3s-node"
