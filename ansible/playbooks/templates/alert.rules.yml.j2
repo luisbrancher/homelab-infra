@@ -9,8 +9,10 @@ groups:
   - name: hosts
     rules:
 
+      # Jobs de sonda ficam de fora: com o blackbox fora, cada alvo viraria um falso "fora do ar".
+      # Quem avisa nesse caso é o job "blackbox" (o regex exige o _, então ele continua aqui).
       - alert: InstanceDown
-        expr: up == 0
+        expr: up{job!~"blackbox_.+"} == 0
         for: {{ alert_instance_down_for }}
         labels:
           severity: critical
@@ -68,6 +70,29 @@ groups:
         annotations:
           summary: "{% raw %}Memória em {{ $value | printf \"%.0f\" }}% ({{ $labels.job }}){% endraw %}"
           description: "Uso de RAM acima de {{ alert_memory_pct }}% há mais de 10 min."
+
+  - name: probes
+    rules:
+
+      # Site ou DNS falhando visto de fora (blackbox). Cobre também certificado já vencido ou inválido.
+      - alert: ProbeFailed
+        expr: probe_success == 0
+        for: {{ alert_probe_down_for }}
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}{{ $labels.instance }} não responde ({{ $labels.job }}){% endraw %}"
+          description: "A sonda do blackbox falha há mais de {{ alert_probe_down_for }}."
+
+      # A renovação automática deveria ter rodado aos 30 dias; abaixo do limiar, ela está falhando.
+      - alert: CertExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) / 86400 < {{ alert_cert_expiry_days }}
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "{% raw %}Certificado de {{ $labels.instance }} vence em {{ $value | printf \"%.0f\" }} dias{% endraw %}"
+          description: "Menos de {{ alert_cert_expiry_days }} dias. Ver a renovação (cert-manager, Caddy ou certbot na AWS)."
 
   - name: meta
     rules:

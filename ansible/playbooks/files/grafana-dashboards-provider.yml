@@ -1,0 +1,17 @@
+# Gerenciado pelo Ansible — não editar manualmente
+# Diz ao Grafana para carregar os dashboards JSON de /etc/grafana/dashboards
+# (fonte no repo: ansible/playbooks/files/grafana-dashboard-*.json).
+apiVersion: 1
+
+providers:
+  - name: homelab
+    folder: Homelab
+    type: file
+    # apagar o JSON não apaga o dashboard da UI (evita sumir por engano)
+    disableDeletion: true
+    # a fonte é o arquivo: a UI não salva alterações
+    allowUiUpdates: false
+    # de quanto em quanto tempo relê a pasta (mudança no JSON não precisa de restart)
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/dashboards

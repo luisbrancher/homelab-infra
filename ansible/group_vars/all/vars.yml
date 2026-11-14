@@ -29,6 +29,25 @@ alert_disk_warning_pct: 80
 alert_disk_critical_pct: 90
 alert_memory_pct: 90
 
+# Blackbox exporter (pacote prometheus-blackbox-exporter do Debian), mesma LXC do Prometheus.
+blackbox_port: 9115
+# Sondas HTTPS pelo caminho real: DNS público -> IPs 100.x da tailnet (MagicDNS na LXC).
+# Testa site no ar e validade do certificado (wildcard do cert-manager, Caddy do git, AWS do site).
+blackbox_http_targets:
+  - https://nextcloud.lflab.cc
+  - https://immich.lflab.cc
+  - https://jellyfin.lflab.cc
+  - https://home.lflab.cc
+  - https://git.lflab.cc
+  - https://luisbrancher.dev
+# Sonda de DNS: o Unbound do OPNsense (fora do inventário, só LAN) resolvendo um nome público.
+blackbox_dns_targets:
+  - 10.10.10.1:53
+blackbox_dns_query_name: debian.org
+# Limiares das regras de sonda
+alert_probe_down_for: 5m
+alert_cert_expiry_days: 14
+
 # pi4
 pi4_ip: "{{ hostvars['pi4']['ansible_host'] }}"
 
