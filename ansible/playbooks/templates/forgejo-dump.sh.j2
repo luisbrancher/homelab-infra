@@ -3,6 +3,10 @@
 # que já entra no snapshot, na réplica e no Cloud Sync cifrado para o Drive.
 set -eu
 
+# O cron roda com PATH=/usr/bin:/bin, e o runuser fica em /usr/sbin. Sem esta linha o script morria no runuser (exit 127).
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
 DEST=/mnt/db-dumps
 TMP=/var/lib/forgejo/dump.zip
 KEEP={{ forgejo_dump_keep }}
@@ -22,3 +26,16 @@ rm -f "$TMP"
 
 # mantém só os $KEEP mais novos
 ls -1t "$DEST"/forgejo-*.zip | tail -n +$((KEEP + 1)) | xargs -r rm -f --
+
+# Métrica para o textfile collector do node exporter (alerta ForgejoDumpStale no Prometheus).
+# Só chega aqui se tudo acima deu certo (set -e). Grava num temporário e renomeia: o mv é atômico, então o node exporter nunca lê o arquivo pela metade. O temporário não termina em .prom, então o coletor o ignora.
+PROM={{ node_exporter_textfile_dir }}/forgejo_dump.prom
+cat > "$PROM.$$" <<EOF
+# HELP forgejo_dump_last_success_timestamp_seconds Fim do último dump do Forgejo com sucesso.
+# TYPE forgejo_dump_last_success_timestamp_seconds gauge
+forgejo_dump_last_success_timestamp_seconds $(date +%s)
+# HELP forgejo_dump_last_size_bytes Tamanho do último dump do Forgejo.
+# TYPE forgejo_dump_last_size_bytes gauge
+forgejo_dump_last_size_bytes $(stat -c %s "$DEST/forgejo-$STAMP.zip")
+EOF
+mv "$PROM.$$" "$PROM"

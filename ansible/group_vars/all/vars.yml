@@ -47,6 +47,8 @@ blackbox_dns_query_name: debian.org
 # Limiares das regras de sonda
 alert_probe_down_for: 5m
 alert_cert_expiry_days: 14
+# Dump diário do Forgejo (02:00 UTC): 24h + folga para um dump lento
+alert_forgejo_dump_max_age_hours: 26
 
 # pi4
 pi4_ip: "{{ hostvars['pi4']['ansible_host'] }}"
@@ -65,6 +67,8 @@ forgejo_domain: "git.lflab.cc"
 forgejo_http_port: 3000
 forgejo_ssh_port: 2222
 forgejo_dump_keep: 14
+# textfile collector do node exporter (padrão do pacote Debian): arquivos *.prom viram métricas
+node_exporter_textfile_dir: /var/lib/prometheus/node-exporter
 # forgejo-runner (Actions), executor host na propria LXC; releases em code.forgejo.org/forgejo/runner
 forgejo_runner_version: "13.2.1"
 # LXCs de site que recebem rsync dos workflows (dash-infra): host keys gravadas no known_hosts do runner

@@ -94,6 +94,31 @@ groups:
           summary: "{% raw %}Certificado de {{ $labels.instance }} vence em {{ $value | printf \"%.0f\" }} dias{% endraw %}"
           description: "Menos de {{ alert_cert_expiry_days }} dias. Ver a renovação (cert-manager, Caddy ou certbot na AWS)."
 
+  - name: backups
+    rules:
+
+      # O forgejo-dump.sh grava o horário no textfile collector só quando termina sem erro.
+      # Qualquer falha (cron, mount, dump) deixa o valor envelhecer.
+      - alert: ForgejoDumpStale
+        expr: time() - forgejo_dump_last_success_timestamp_seconds > {{ alert_forgejo_dump_max_age_hours }} * 3600
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{% raw %}Backup do Forgejo: último sucesso há {{ $value | humanizeDuration }}{% endraw %}"
+          description: "Sem dump com sucesso há mais de {{ alert_forgejo_dump_max_age_hours }}h. Testar com env -i PATH=/usr/bin:/bin /bin/sh -c /usr/local/bin/forgejo-dump.sh na LXC."
+
+      # Sem a métrica, a regra de cima não tem o que avaliar: um script que nunca deu certo
+      # (o caso de 2026-11-09 a 11-14) passaria em silêncio.
+      - alert: ForgejoDumpNeverReported
+        expr: absent(forgejo_dump_last_success_timestamp_seconds)
+        for: {{ alert_forgejo_dump_max_age_hours }}h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup do Forgejo nunca registrou sucesso"
+          description: "A métrica forgejo_dump_last_success_timestamp_seconds não existe há {{ alert_forgejo_dump_max_age_hours }}h (script nunca terminou, ou o node exporter da LXC não a expõe)."
+
   - name: meta
     rules:
       # Sempre ativo. Se parar de chegar no dead man's switch (fase 3), o Prometheus ou o Alertmanager caiu.

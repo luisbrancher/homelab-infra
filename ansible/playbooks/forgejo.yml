@@ -111,6 +111,7 @@
         cmd: /usr/bin/caddy list-modules
       register: caddy_modules
       changed_when: false
+      check_mode: false # só lê; sem isso o --check não roda e acusa um download falso
 
     - name: Download Caddy build with the Cloudflare DNS plugin
       ansible.builtin.get_url:
@@ -189,6 +190,7 @@
         owner: root
         group: root
         mode: '0750'
+        validate: sh -n %s # só checa a sintaxe, não executa
 
     - name: Schedule daily Forgejo dump
       ansible.builtin.cron:
@@ -229,6 +231,7 @@
       register: tailscale_status
       changed_when: false
       failed_when: false
+      check_mode: false # só lê, roda também no --check
 
     - name: Connect to Tailscale with auth key
       ansible.builtin.command:
@@ -330,7 +333,9 @@
         path: /var/lib/forgejo-runner/.ssh/known_hosts
         owner: runner
         group: runner
-        mode: '0644'
+        # 0600: o ssh reescreve o arquivo com 0600 ao gravar host keys novas (UpdateHostKeys);
+        # com 0644 aqui, cada execução do playbook brigava com ele
+        mode: '0600'
 
     - name: Create forgejo-runner service on systemd
       ansible.builtin.copy:
