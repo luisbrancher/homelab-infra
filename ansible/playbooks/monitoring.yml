@@ -54,6 +54,32 @@
         group: grafana
       notify: Restart Grafana
 
+    # dashboards provisionados: JSON em files/, copiados sem Jinja (as chaves duplas são do Grafana)
+    - name: Create Grafana dashboards directory
+      ansible.builtin.file:
+        path: /etc/grafana/dashboards
+        state: directory
+        owner: root
+        group: grafana
+        mode: '0755'
+
+    - name: Copy Grafana dashboards provider
+      ansible.builtin.copy:
+        src: files/grafana-dashboards-provider.yml
+        dest: /etc/grafana/provisioning/dashboards/homelab.yml
+        owner: root
+        group: grafana
+        mode: '0640'
+      notify: Restart Grafana # o provider só é lido na inicialização
+
+    - name: Copy Grafana dashboards
+      ansible.builtin.copy:
+        src: files/grafana-dashboard-uptime.json
+        dest: /etc/grafana/dashboards/uptime.json
+        owner: root
+        group: grafana
+        mode: '0640'
+
     # prometheus
     - name: Install Prometheus
       ansible.builtin.apt:
@@ -111,6 +137,32 @@
         regexp: '^ARGS='
         line: 'ARGS="--cluster.listen-address="'
       notify: Restart Alertmanager
+
+    # blackbox exporter (sondas HTTPS e DNS, alvos no prometheus.yml)
+    - name: Install Blackbox exporter
+      ansible.builtin.apt:
+        name: prometheus-blackbox-exporter
+        state: present
+
+    - name: Copy Blackbox exporter config
+      ansible.builtin.template:
+        src: templates/blackbox.yml.j2
+        dest: /etc/prometheus/blackbox.yml
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+        validate: prometheus-blackbox-exporter --config.check --config.file=%s
+      notify: Restart Blackbox exporter
+
+    # Só em 127.0.0.1: o /probe aceita qualquer alvo, e exposto na rede viraria um scanner da LAN/tailnet na mão de quem chamar. O Prometheus está na mesma LXC.
+    - name: Set Blackbox exporter flags
+      ansible.builtin.lineinfile:
+        path: /etc/default/prometheus-blackbox-exporter
+        regexp: '^ARGS='
+        line: 'ARGS="--config.file=/etc/prometheus/blackbox.yml --web.listen-address=127.0.0.1:{{ blackbox_port }}"'
+      # no --check o apt só simula, o arquivo ainda não existe na primeira vez
+      ignore_errors: "{{ ansible_check_mode }}"
+      notify: Restart Blackbox exporter
 
     # loki
     - name: Create Loki user
@@ -176,6 +228,7 @@
       - grafana-server
       - prometheus
       - prometheus-alertmanager
+      - prometheus-blackbox-exporter
       - loki
 
   # node exporter
@@ -229,6 +282,11 @@
     - name: Restart Alertmanager
       ansible.builtin.service:
         name: prometheus-alertmanager
+        state: restarted
+
+    - name: Restart Blackbox exporter
+      ansible.builtin.service:
+        name: prometheus-blackbox-exporter
         state: restarted
 
     - name: Restart Grafana

@@ -28,6 +28,43 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:{{ alertmanager_port }}"]
 
+  # o próprio blackbox: se ele cair, é este alvo que vira InstanceDown
+  - job_name: "blackbox"
+    static_configs:
+      - targets: ["localhost:{{ blackbox_port }}"]
+
+  # Sondas: cada alvo da lista vira GET localhost:9115/probe?module=...&target=<alvo>.
+  # O relabel abaixo faz essa troca; o instance fica com o alvo, não com o localhost.
+  - job_name: "blackbox_http"
+    scrape_interval: 30s # cada scrape é uma visita real ao site (gera log no ingress)
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: {{ blackbox_http_targets | to_json }}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "localhost:{{ blackbox_port }}"
+
+  - job_name: "blackbox_dns"
+    scrape_interval: 30s
+    metrics_path: /probe
+    params:
+      module: [dns_recursion]
+    static_configs:
+      - targets: {{ blackbox_dns_targets | to_json }}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: "localhost:{{ blackbox_port }}"
+
   # métricas do k3s-node
   - job_name: "k3s-node"
     static_configs:

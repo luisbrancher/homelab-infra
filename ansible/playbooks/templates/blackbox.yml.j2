@@ -1,0 +1,33 @@
+# Gerenciado pelo Ansible — não editar manualmente
+# Módulos do blackbox exporter: cada um é uma "receita" de teste. O Prometheus diz qual
+# módulo usar e contra qual alvo em cada scrape (job blackbox_* no prometheus.yml).
+
+modules:
+
+  # HTTPS de ponta a ponta: DNS, conexão, TLS válido e resposta 2xx (segue redirects)
+  http_2xx:
+    prober: http
+    timeout: 8s
+    http:
+      # os nomes só têm registro A (IPs 100.x da tailnet); sem isso ele tenta IPv6 primeiro
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      # falha se algum redirect cair em http:// sem TLS
+      fail_if_not_ssl: true
+
+  # Recursão no Unbound: resposta NOERROR com pelo menos um registro A
+  dns_recursion:
+    prober: dns
+    timeout: 5s
+    dns:
+      transport_protocol: udp
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      query_name: "{{ blackbox_dns_query_name }}"
+      query_type: A
+      valid_rcodes:
+        - NOERROR
+      # NOERROR com ANSWER: 0 (ex.: filtro de rebind) também conta como falha
+      validate_answer_rrs:
+        fail_if_none_matches_regexp:
+          - ".*\tIN\tA\t.*"
